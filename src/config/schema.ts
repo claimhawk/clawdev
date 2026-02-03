@@ -967,6 +967,10 @@ function applyChannelSchemas(schema: ConfigSchema, channels: ChannelUiMetadata[]
     }
   }
 
+  // All known channel properties are now merged; close the schema so the
+  // config form analyzer doesn't mark the channels node as unsupported.
+  channelsNode.additionalProperties = false;
+
   return next;
 }
 

@@ -386,7 +386,20 @@ function truncateValue(value: unknown, maxLen = 40): string {
 export function renderConfig(props: ConfigProps) {
   const validity = props.valid == null ? "unknown" : props.valid ? "valid" : "invalid";
   const analysis = analyzeConfigSchema(props.schema);
-  const formUnsafe = analysis.schema ? analysis.unsupportedPaths.length > 0 : false;
+  // Only warn if the user's config actually has values at unsupported paths.
+  // Many advanced schema nodes (unions, complex records) are unsupported by the
+  // form renderer but rarely used — no need to scare users with empty configs.
+  const formUnsafe = analysis.schema
+    ? analysis.unsupportedPaths.some((p) => {
+        const parts = p.split(".");
+        let cursor: unknown = props.formValue;
+        for (const part of parts) {
+          if (cursor == null || typeof cursor !== "object") return false;
+          cursor = (cursor as Record<string, unknown>)[part];
+        }
+        return cursor != null;
+      })
+    : false;
 
   // Get available sections from schema
   const schemaProps = analysis.schema?.properties ?? {};
