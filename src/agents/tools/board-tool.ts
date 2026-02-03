@@ -8,14 +8,6 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
-  type Ticket,
-  type TicketStatus,
-  type TicketType,
-  type BoardSummary,
-  VALID_STATUSES,
-  VALID_TYPES,
-} from "../../board/types.js";
-import {
   initBoard,
   loadBoard,
   createTicket,
@@ -30,6 +22,14 @@ import {
   addComment,
   listTickets,
 } from "../../board/storage.js";
+import {
+  type Ticket,
+  type TicketStatus,
+  type TicketType,
+  type BoardSummary,
+  VALID_STATUSES,
+  VALID_TYPES,
+} from "../../board/types.js";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../agent-scope.js";
 import { stringEnum, optionalStringEnum } from "../schema/typebox.js";
 import { type AnyAgentTool, jsonResult, readStringParam } from "./common.js";
@@ -97,11 +97,7 @@ function formatTicketSummary(ticket: Ticket): string {
 }
 
 function formatBoardStatus(summary: BoardSummary): string {
-  const lines: string[] = [
-    `# ${summary.projectName} Board`,
-    "",
-    "## Columns",
-  ];
+  const lines: string[] = [`# ${summary.projectName} Board`, "", "## Columns"];
 
   for (const status of VALID_STATUSES) {
     const count = summary.columnCounts[status] ?? 0;
@@ -176,8 +172,7 @@ Use during heartbeat to autonomously manage project work.`,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
       const action = readStringParam(params, "action", { required: true });
-      const ticketId =
-        readStringParam(params, "ticketId") ?? readStringParam(params, "id");
+      const ticketId = readStringParam(params, "ticketId") ?? readStringParam(params, "id");
 
       switch (action) {
         case "init": {
@@ -362,9 +357,7 @@ Use during heartbeat to autonomously manage project work.`,
               title: t.title,
               statusChangedAt: t.statusChangedAt,
             })),
-            formatted:
-              tickets.map(formatTicketSummary).join("\n") ||
-              "(no stale tickets)",
+            formatted: tickets.map(formatTicketSummary).join("\n") || "(no stale tickets)",
           });
         }
 

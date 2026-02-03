@@ -1,10 +1,5 @@
 export type TicketType = "feature" | "bugfix" | "chore" | "experiment";
-export type TicketStatus =
-  | "backlog"
-  | "ready"
-  | "in-progress"
-  | "review"
-  | "done";
+export type TicketStatus = "backlog" | "ready" | "in-progress" | "review" | "done";
 export type TicketPriority = "critical" | "high" | "medium" | "low";
 export type AssigneeType = "human" | "agent";
 
@@ -49,9 +44,7 @@ export type TicketCreateInput = {
   acceptanceSignal?: string;
 };
 
-export type TicketUpdateInput = Partial<
-  Omit<Ticket, "id" | "createdAt" | "createdBy">
->;
+export type TicketUpdateInput = Partial<Omit<Ticket, "id" | "createdAt" | "createdBy">>;
 
 export type BoardSettings = {
   defaultPriority: TicketPriority;
@@ -141,13 +134,7 @@ export const DEFAULT_BOARD_SETTINGS: BoardSettings = {
   staleInProgressHours: 48,
 };
 
-export const VALID_STATUSES: TicketStatus[] = [
-  "backlog",
-  "ready",
-  "in-progress",
-  "review",
-  "done",
-];
+export const VALID_STATUSES: TicketStatus[] = ["backlog", "ready", "in-progress", "review", "done"];
 
 export const TICKET_STATUS_ORDER: Record<TicketStatus, number> = {
   backlog: 0,
@@ -157,12 +144,7 @@ export const TICKET_STATUS_ORDER: Record<TicketStatus, number> = {
   done: 4,
 };
 
-export const VALID_TYPES: TicketType[] = [
-  "feature",
-  "bugfix",
-  "chore",
-  "experiment",
-];
+export const VALID_TYPES: TicketType[] = ["feature", "bugfix", "chore", "experiment"];
 
 export const VALID_PRIORITIES: TicketPriority[] = ["critical", "high", "medium", "low"];
 

@@ -16,7 +16,6 @@ import {
   type Board,
   type BoardWithTickets,
   type CodeLocation,
-  type Comment,
   type Ticket,
   type TicketCreateInput,
   type TicketUpdateInput,
@@ -145,9 +144,7 @@ export async function ensureBoardDir(workspaceDir: string): Promise<string> {
   return boardDir;
 }
 
-export async function loadBoard(
-  workspaceDir: string,
-): Promise<Board | null> {
+export async function loadBoard(workspaceDir: string): Promise<Board | null> {
   const boardDir = path.join(workspaceDir, BOARD_DIR);
   const boardPath = path.join(boardDir, BOARD_FILE);
 
@@ -163,10 +160,7 @@ export async function loadBoard(
   }
 }
 
-export async function saveBoard(
-  workspaceDir: string,
-  board: Board,
-): Promise<void> {
+export async function saveBoard(workspaceDir: string, board: Board): Promise<void> {
   const boardDir = await ensureBoardDir(workspaceDir);
   const boardPath = path.join(boardDir, BOARD_FILE);
   const content = yaml.stringify(board, { lineWidth: 120 });
@@ -202,17 +196,19 @@ export async function initBoard(
   return board;
 }
 
-export async function loadTicket(
-  workspaceDir: string,
-  ticketId: string,
-): Promise<Ticket | null> {
+export async function loadTicket(workspaceDir: string, ticketId: string): Promise<Ticket | null> {
   const boardDir = path.join(workspaceDir, BOARD_DIR);
   const filePath = ticketPath(boardDir, ticketId);
 
   try {
     const content = await fs.readFile(filePath, "utf-8");
-    const raw = parseYamlSafe<Record<string, unknown>>(content, null as unknown as Record<string, unknown>);
-    if (!raw) return null;
+    const raw = parseYamlSafe<Record<string, unknown>>(
+      content,
+      null as unknown as Record<string, unknown>,
+    );
+    if (!raw) {
+      return null;
+    }
     return migrateTicket(raw);
   } catch (err) {
     const anyErr = err as { code?: string };
@@ -223,20 +219,14 @@ export async function loadTicket(
   }
 }
 
-export async function saveTicket(
-  workspaceDir: string,
-  ticket: Ticket,
-): Promise<void> {
+export async function saveTicket(workspaceDir: string, ticket: Ticket): Promise<void> {
   const boardDir = await ensureBoardDir(workspaceDir);
   const filePath = ticketPath(boardDir, ticket.id);
   const content = yaml.stringify(ticket, { lineWidth: 120 });
   await fs.writeFile(filePath, content, "utf-8");
 }
 
-export async function deleteTicket(
-  workspaceDir: string,
-  ticketId: string,
-): Promise<boolean> {
+export async function deleteTicket(workspaceDir: string, ticketId: string): Promise<boolean> {
   const boardDir = path.join(workspaceDir, BOARD_DIR);
   const filePath = ticketPath(boardDir, ticketId);
 
@@ -264,7 +254,10 @@ export async function listTickets(workspaceDir: string): Promise<Ticket[]> {
     for (const file of yamlFiles) {
       try {
         const content = await fs.readFile(path.join(ticketsDir, file), "utf-8");
-        const raw = parseYamlSafe<Record<string, unknown>>(content, null as unknown as Record<string, unknown>);
+        const raw = parseYamlSafe<Record<string, unknown>>(
+          content,
+          null as unknown as Record<string, unknown>,
+        );
         if (raw && (raw as { id?: string }).id) {
           tickets.push(migrateTicket(raw));
         }
@@ -283,9 +276,7 @@ export async function listTickets(workspaceDir: string): Promise<Ticket[]> {
   }
 }
 
-export async function loadBoardWithTickets(
-  workspaceDir: string,
-): Promise<BoardWithTickets | null> {
+export async function loadBoardWithTickets(workspaceDir: string): Promise<BoardWithTickets | null> {
   const board = await loadBoard(workspaceDir);
   if (!board) {
     return null;
@@ -443,15 +434,12 @@ export async function getTicketsByStatus(
   const tickets = await listTickets(workspaceDir);
   return tickets
     .filter((t) => t.status === status)
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 }
 
-export async function getStaleTickets(
-  workspaceDir: string,
-  maxHours: number,
-): Promise<Ticket[]> {
+export async function getStaleTickets(workspaceDir: string, maxHours: number): Promise<Ticket[]> {
   const tickets = await listTickets(workspaceDir);
   const cutoff = Date.now() - maxHours * 60 * 60 * 1000;
 
@@ -463,9 +451,7 @@ export async function getStaleTickets(
   );
 }
 
-export async function getBoardSummary(
-  workspaceDir: string,
-): Promise<BoardSummary | null> {
+export async function getBoardSummary(workspaceDir: string): Promise<BoardSummary | null> {
   const board = await loadBoard(workspaceDir);
   if (!board) {
     return null;
@@ -478,18 +464,15 @@ export async function getBoardSummary(
     columnCounts[status] = tickets.filter((t) => t.status === status).length;
   }
 
-  const staleTickets = await getStaleTickets(
-    workspaceDir,
-    board.settings.staleInProgressHours,
-  );
+  const staleTickets = await getStaleTickets(workspaceDir, board.settings.staleInProgressHours);
 
   const backlogTickets = tickets
     .filter((t) => t.status === "backlog")
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    .toSorted((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   const inProgressTickets = tickets
     .filter((t) => t.status === "in-progress")
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const aTime = a.statusChangedAt ? new Date(a.statusChangedAt).getTime() : 0;
       const bTime = b.statusChangedAt ? new Date(b.statusChangedAt).getTime() : 0;
       return aTime - bTime;
@@ -499,10 +482,9 @@ export async function getBoardSummary(
     ? Date.now() - new Date(backlogTickets[0].createdAt).getTime()
     : null;
 
-  const oldestInProgressAgeMs =
-    inProgressTickets[0]?.statusChangedAt
-      ? Date.now() - new Date(inProgressTickets[0].statusChangedAt).getTime()
-      : null;
+  const oldestInProgressAgeMs = inProgressTickets[0]?.statusChangedAt
+    ? Date.now() - new Date(inProgressTickets[0].statusChangedAt).getTime()
+    : null;
 
   return {
     id: board.id,
@@ -519,9 +501,7 @@ export async function getBoardSummary(
   };
 }
 
-export async function getNextWorkItem(
-  workspaceDir: string,
-): Promise<Ticket | null> {
+export async function getNextWorkItem(workspaceDir: string): Promise<Ticket | null> {
   const board = await loadBoard(workspaceDir);
   if (!board) {
     return null;

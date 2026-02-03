@@ -56,7 +56,8 @@ export function loadSettings(): UiSettings {
           ? parsed.gatewayUrl.trim()
           : defaults.gatewayUrl,
       // Use saved token if present, otherwise fall back to injected token
-      token: typeof parsed.token === "string" && parsed.token.trim() ? parsed.token : defaults.token,
+      token:
+        typeof parsed.token === "string" && parsed.token.trim() ? parsed.token : defaults.token,
       sessionKey:
         typeof parsed.sessionKey === "string" && parsed.sessionKey.trim()
           ? parsed.sessionKey.trim()

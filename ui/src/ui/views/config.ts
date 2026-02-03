@@ -394,7 +394,9 @@ export function renderConfig(props: ConfigProps) {
         const parts = p.split(".");
         let cursor: unknown = props.formValue;
         for (const part of parts) {
-          if (cursor == null || typeof cursor !== "object") return false;
+          if (cursor == null || typeof cursor !== "object") {
+            return false;
+          }
           cursor = (cursor as Record<string, unknown>)[part];
         }
         return cursor != null;

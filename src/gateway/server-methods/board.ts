@@ -4,8 +4,9 @@
  * RPC methods for interacting with project boards from the Control UI.
  */
 
+import type { TicketType, TicketStatus } from "../../board/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
-import { ErrorCodes, errorShape } from "../protocol/index.js";
+import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   initBoard,
   listTickets,
@@ -16,9 +17,8 @@ import {
   addComment,
   getBoardSummary,
 } from "../../board/storage.js";
-import type { TicketType, TicketStatus } from "../../board/types.js";
 import { loadConfig, type OpenClawConfig } from "../../config/config.js";
-import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { ErrorCodes, errorShape } from "../protocol/index.js";
 
 type BoardMethodParams = {
   sessionKey?: string;
@@ -93,7 +93,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to init board"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to init board",
+        ),
       );
     }
   },
@@ -123,7 +126,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to get board status"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to get board status",
+        ),
       );
     }
   },
@@ -154,7 +160,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to list tickets"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to list tickets",
+        ),
       );
     }
   },
@@ -181,7 +190,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to view ticket"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to view ticket",
+        ),
       );
     }
   },
@@ -226,18 +238,23 @@ export const boardMethods: GatewayRequestHandlers = {
         const ticket = await loadTicket(workspaceDir, p.ticketId);
         respond(true, {
           ok: true,
-          ticket: ticket ? {
-            id: ticket.id,
-            title: ticket.title,
-            status: ticket.status,
-          } : null,
+          ticket: ticket
+            ? {
+                id: ticket.id,
+                title: ticket.title,
+                status: ticket.status,
+              }
+            : null,
         });
       }
     } catch (err) {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to update ticket"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to update ticket",
+        ),
       );
     }
   },
@@ -273,7 +290,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to create ticket"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to create ticket",
+        ),
       );
     }
   },
@@ -293,12 +313,7 @@ export const boardMethods: GatewayRequestHandlers = {
     }
 
     try {
-      const ticket = await moveTicket(
-        workspaceDir,
-        p.ticketId,
-        p.toStatus as TicketStatus,
-        p.note,
-      );
+      const ticket = await moveTicket(workspaceDir, p.ticketId, p.toStatus as TicketStatus, p.note);
 
       respond(true, {
         ok: true,
@@ -313,7 +328,10 @@ export const boardMethods: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : "Failed to move ticket"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          err instanceof Error ? err.message : "Failed to move ticket",
+        ),
       );
     }
   },

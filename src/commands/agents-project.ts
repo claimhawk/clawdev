@@ -9,14 +9,14 @@
  */
 
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
-import { loadConfig, writeConfigFile } from "../config/config.js";
+import path from "node:path";
 import type { AgentConfig } from "../config/types.agents.js";
 import type { AgentBinding } from "../config/types.agents.js";
-import { initBoard } from "../board/storage.js";
-import { resolveUserPath } from "../utils.js";
 import type { RuntimeEnv } from "../runtime.js";
+import { initBoard } from "../board/storage.js";
+import { loadConfig, writeConfigFile } from "../config/config.js";
+import { resolveUserPath } from "../utils.js";
 
 export type AgentsProjectOptions = {
   /** Project name (also used as agent ID) */
@@ -155,7 +155,7 @@ This file accumulates knowledge, decisions, and learnings across sessions.
 
 export async function agentsProjectCommand(
   opts: AgentsProjectOptions,
-  runtime: RuntimeEnv,
+  _runtime: RuntimeEnv,
 ): Promise<void> {
   const cfg = loadConfig();
 
@@ -191,8 +191,14 @@ export async function agentsProjectCommand(
   await ensureFile(path.join(workspaceDir, "SOUL.md"), generateSoulMd(projectName));
   await ensureFile(path.join(workspaceDir, "HEARTBEAT.md"), generateHeartbeatMd());
   await ensureFile(path.join(workspaceDir, "MEMORY.md"), generateMemoryMd(projectName));
-  await ensureFile(path.join(workspaceDir, "AGENTS.md"), `# Sub-agents\n\nNo sub-agents configured yet.\n`);
-  await ensureFile(path.join(workspaceDir, "TOOLS.md"), `# Tools\n\nThis project uses the default tool configuration.\n`);
+  await ensureFile(
+    path.join(workspaceDir, "AGENTS.md"),
+    `# Sub-agents\n\nNo sub-agents configured yet.\n`,
+  );
+  await ensureFile(
+    path.join(workspaceDir, "TOOLS.md"),
+    `# Tools\n\nThis project uses the default tool configuration.\n`,
+  );
 
   // Initialize the project board
   await initBoard(workspaceDir, agentId, projectName);
@@ -250,15 +256,21 @@ export async function agentsProjectCommand(
 
   // Output result
   if (opts.json) {
-    console.log(JSON.stringify({
-      status: "ok",
-      agentId,
-      projectName,
-      workspace: workspaceDir,
-      boardInitialized: true,
-      heartbeat: heartbeatInterval,
-      channel: opts.channel ?? null,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          status: "ok",
+          agentId,
+          projectName,
+          workspace: workspaceDir,
+          boardInitialized: true,
+          heartbeat: heartbeatInterval,
+          channel: opts.channel ?? null,
+        },
+        null,
+        2,
+      ),
+    );
   } else {
     console.log(`\n✓ Created project agent: ${agentId}`);
     console.log(`  Workspace: ${workspaceDir}`);
@@ -268,7 +280,9 @@ export async function agentsProjectCommand(
     }
     console.log(`\n  Board initialized with prefix: ${agentId.toUpperCase().slice(0, 4)}`);
     console.log(`\n  Next steps:`);
-    console.log(`  1. Add vague goals to backlog: openclaw agent --agent ${agentId} -m "Add to backlog: <your idea>"`);
+    console.log(
+      `  1. Add vague goals to backlog: openclaw agent --agent ${agentId} -m "Add to backlog: <your idea>"`,
+    );
     console.log(`  2. The agent will refine and work on tasks during heartbeat`);
     console.log(`  3. View progress: openclaw agent --agent ${agentId} -m "Show board status"`);
   }

@@ -1,9 +1,10 @@
-import { html, nothing } from "lit";
+import { html, nothing, render as litRender } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import type { AppViewState } from "./app-view-state";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
 import type { AgentsListResult, SessionsListResult } from "./types";
+import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChat } from "./app-chat";
 import { syncUrlWithSessionKey } from "./app-settings";
 import { loadAgents } from "./controllers/agents";
@@ -11,13 +12,11 @@ import { loadChatHistory } from "./controllers/chat";
 import { loadSessions } from "./controllers/sessions";
 import { icons } from "./icons";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation";
-import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 
 /**
  * Renders the global session selector in the topbar.
  * Available on all pages to switch between agent sessions.
  */
-const NEW_AGENT_VALUE = "__new_agent__";
 
 function switchToSession(state: AppViewState, next: string) {
   state.sessionKey = next;
@@ -39,7 +38,68 @@ function switchToSession(state: AppViewState, next: string) {
   void loadSessions(state);
 }
 
-export function renderSessionSelector(state: AppViewState) {
+// --- Custom dropdown state (closure-level) ---
+let _dropdownOpen = false;
+let _confirmingKey: string | null = null;
+let _creatingAgent = false;
+let _dropdownContainer: HTMLElement | null = null;
+
+function closeDropdown() {
+  _dropdownOpen = false;
+  _confirmingKey = null;
+  _creatingAgent = false;
+}
+
+/** Returns true if this session key is protected from deletion. */
+function isProtectedKey(key: string, mainSessionKey: string | null): boolean {
+  if (key === "main") {
+    return true;
+  }
+  if (mainSessionKey && key === mainSessionKey) {
+    return true;
+  }
+  // agent:main:main is the default main agent session
+  const parsed = parseAgentSessionKey(key);
+  if (parsed?.agentId === "main") {
+    return true;
+  }
+  return false;
+}
+
+/** Extracts the agent id from a session key like "agent:foo:main" → "foo". */
+function agentIdFromKey(key: string): string | null {
+  const parsed = parseAgentSessionKey(key);
+  return parsed?.agentId ?? null;
+}
+
+type AgentEntry = { id: string; name?: string };
+
+/**
+ * Merge agent lists from local UI state and config.get into a single
+ * deduplicated list.  Union by id ensures no agent is lost even when
+ * one source is stale (e.g. gateway mid-restart).  Local state wins
+ * for name when both sources have the same id.
+ */
+function mergeAgentLists(local: AgentEntry[], remote: AgentEntry[]): AgentEntry[] {
+  const byId = new Map<string, AgentEntry>();
+  // Remote first so local overwrites
+  for (const a of remote) {
+    byId.set(a.id, { id: a.id, name: a.name });
+  }
+  for (const a of local) {
+    byId.set(a.id, { id: a.id, name: a.name });
+  }
+  return [...byId.values()];
+}
+
+function buildLocalAgentList(state: AppViewState): AgentEntry[] {
+  if (!state.agentsList?.agents) {
+    return [];
+  }
+  return state.agentsList.agents.map((a) => ({ id: a.id, name: a.name }));
+}
+
+function renderDropdownContent(state: AppViewState) {
   const mainSessionKey = resolveMainSessionKey(state.hello, state.sessionsResult);
   const sessionOptions = resolveSessionOptions(
     state.sessionKey,
@@ -48,93 +108,320 @@ export function renderSessionSelector(state: AppViewState) {
     state.agentsList,
   );
 
-  const handleSessionChange = async (e: Event) => {
-    const select = e.target as HTMLSelectElement;
-    const next = select.value;
+  const handleSelect = (key: string) => {
+    closeDropdown();
+    rerenderDropdown(state);
+    switchToSession(state, key);
+  };
 
-    if (next === NEW_AGENT_VALUE) {
-      // Reset select to current value immediately
-      select.value = state.sessionKey;
+  const handleTrashClick = (key: string, e: Event) => {
+    e.stopPropagation();
+    _confirmingKey = key;
+    rerenderDropdown(state);
+  };
 
-      const projectName = window.prompt("Agent name:");
-      if (!projectName?.trim()) {
-        return;
-      }
-
-      const agentId = projectName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-
-      if (!agentId) {
-        return;
-      }
-
-      try {
-        // Get current config + baseHash for optimistic concurrency
-        const snapshot = await state.client?.request<{
-          config: { agents?: { list?: Array<{ id: string; name?: string }> } };
-          baseHash: string;
-        }>("config.get", {});
-
-        const existingAgents = snapshot?.config?.agents?.list ?? [];
-        if (existingAgents.some((a) => a.id === agentId)) {
-          // Agent already exists, just switch
-          switchToSession(state, `agent:${agentId}:main`);
-          return;
-        }
-
-        const updatedList = [...existingAgents, { id: agentId, name: projectName.trim() }];
-        const newSessionKey = `agent:${agentId}:main`;
-
-        // Switch session immediately so it persists in settings.
-        // config.patch triggers a gateway restart, which drops the WS
-        // connection. The reconnect handler will re-load agents and
-        // chat history with the new session key already set.
-        switchToSession(state, newSessionKey);
-
-        await state.client?.request("config.patch", {
-          raw: JSON.stringify({ agents: { list: updatedList } }),
-          baseHash: snapshot?.baseHash,
-        });
-
-        // Try to load agents now, but the gateway may be restarting.
-        // If this fails, the reconnect handler will pick it up.
-        try {
-          await loadAgents(state);
-        } catch {
-          // Expected during gateway restart
-        }
-      } catch (err) {
-        console.error("[session-selector] Failed to create agent:", err);
-      }
+  const handleConfirmDelete = async (key: string, e: Event) => {
+    e.stopPropagation();
+    const agentId = agentIdFromKey(key);
+    if (!agentId) {
       return;
     }
 
-    switchToSession(state, next);
+    // Optimistically update local state so the UI reflects the change now
+    if (state.agentsList) {
+      state.agentsList = {
+        ...state.agentsList,
+        agents: state.agentsList.agents.filter((a) => a.id !== agentId),
+      };
+    }
+    if (state.sessionsResult?.sessions) {
+      const deletedPrefix = `agent:${agentId}:`;
+      state.sessionsResult = {
+        ...state.sessionsResult,
+        sessions: state.sessionsResult.sessions.filter((s) => !s.key.startsWith(deletedPrefix)),
+      };
+    }
+
+    if (state.sessionKey === key) {
+      const fallback = mainSessionKey ?? "main";
+      switchToSession(state, fallback);
+    }
+
+    closeDropdown();
+    rerenderDropdown(state);
+
+    try {
+      // Fetch config for baseHash + remote agent list
+      const snapshot = await state.client?.request<{
+        config: { agents?: { list?: AgentEntry[] } };
+        baseHash: string;
+      }>("config.get", {});
+
+      // Merge local + remote so no agent is lost from either source,
+      // then remove the target agent from the merged result.
+      const remoteAgents = snapshot?.config?.agents?.list ?? [];
+      const localAgents = buildLocalAgentList(state);
+      const merged = mergeAgentLists(localAgents, remoteAgents);
+      const updatedList = merged.filter((a) => a.id !== agentId);
+
+      await state.client?.request("config.patch", {
+        raw: JSON.stringify({ agents: { list: updatedList } }),
+        baseHash: snapshot?.baseHash,
+      });
+
+      try {
+        await loadAgents(state);
+      } catch {
+        // Gateway may be restarting
+      }
+    } catch (err) {
+      console.error("[session-selector] Failed to delete agent:", err);
+    }
+  };
+
+  const handleShowCreateInput = (e: Event) => {
+    e.stopPropagation();
+    _creatingAgent = true;
+    _confirmingKey = null;
+    rerenderDropdown(state);
+    requestAnimationFrame(() => {
+      const input = _dropdownContainer?.querySelector<HTMLInputElement>(
+        ".session-selector__create-input",
+      );
+      input?.focus();
+    });
+  };
+
+  const submitNewAgent = async (projectName: string) => {
+    const trimmed = projectName.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const agentId = trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    if (!agentId) {
+      return;
+    }
+
+    // Check if already exists locally
+    const localAgents = buildLocalAgentList(state);
+    if (localAgents.some((a) => a.id === agentId)) {
+      closeDropdown();
+      rerenderDropdown(state);
+      switchToSession(state, `agent:${agentId}:main`);
+      return;
+    }
+
+    const newSessionKey = `agent:${agentId}:main`;
+    const newEntry: AgentEntry = { id: agentId, name: trimmed };
+
+    // Optimistically update local state
+    if (state.agentsList) {
+      state.agentsList = {
+        ...state.agentsList,
+        agents: [...state.agentsList.agents, { id: agentId, name: trimmed }],
+      };
+    }
+
+    closeDropdown();
+    rerenderDropdown(state);
+    switchToSession(state, newSessionKey);
+
+    try {
+      // Fetch config for baseHash + remote agent list
+      const snapshot = await state.client?.request<{
+        config: { agents?: { list?: AgentEntry[] } };
+        baseHash: string;
+      }>("config.get", {});
+
+      // Merge local + remote, then add the new agent.
+      // mergeAgentLists dedupes by id, so the new agent (already in
+      // local state) will be included even if config.get is stale.
+      const remoteAgents = snapshot?.config?.agents?.list ?? [];
+      const merged = mergeAgentLists(localAgents, remoteAgents);
+      const updatedList = merged.some((a) => a.id === agentId) ? merged : [...merged, newEntry];
+
+      await state.client?.request("config.patch", {
+        raw: JSON.stringify({ agents: { list: updatedList } }),
+        baseHash: snapshot?.baseHash,
+      });
+
+      try {
+        await loadAgents(state);
+      } catch {
+        // Expected during gateway restart
+      }
+    } catch (err) {
+      console.error("[session-selector] Failed to create agent:", err);
+    }
+  };
+
+  const handleCreateKeydown = (e: KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      const input = e.target as HTMLInputElement;
+      void submitNewAgent(input.value);
+    } else if (e.key === "Escape") {
+      _creatingAgent = false;
+      rerenderDropdown(state);
+    }
+  };
+
+  const handleCreateSubmit = (e: Event) => {
+    e.stopPropagation();
+    const input = _dropdownContainer?.querySelector<HTMLInputElement>(
+      ".session-selector__create-input",
+    );
+    if (input) {
+      void submitNewAgent(input.value);
+    }
+  };
+
+  return html`
+    ${repeat(
+      sessionOptions,
+      (entry) => entry.key,
+      (entry) => {
+        const isActive = entry.key === state.sessionKey;
+        const isDeletable = !isProtectedKey(entry.key, mainSessionKey);
+        const isConfirming = _confirmingKey === entry.key;
+
+        return html`
+          <div
+            class="session-selector__option ${isActive ? "session-selector__option--active" : ""}"
+            @click=${() => handleSelect(entry.key)}
+          >
+            <span class="session-selector__option-label">
+              ${entry.displayName ?? entry.key}
+            </span>
+            ${
+              isDeletable
+                ? isConfirming
+                  ? html`<button
+                    class="session-selector__confirm-btn"
+                    @click=${(e: Event) => void handleConfirmDelete(entry.key, e)}
+                    title="Confirm removal"
+                  >Confirm</button>`
+                  : html`<button
+                    class="session-selector__delete-btn"
+                    @click=${(e: Event) => handleTrashClick(entry.key, e)}
+                    title="Remove agent"
+                  >🗑</button>`
+                : nothing
+            }
+          </div>
+        `;
+      },
+    )}
+    <div class="session-selector__divider"></div>
+    ${
+      _creatingAgent
+        ? html`
+        <div class="session-selector__create-row" @click=${(e: Event) => e.stopPropagation()}>
+          <input
+            class="session-selector__create-input"
+            type="text"
+            placeholder="Agent name"
+            @keydown=${handleCreateKeydown}
+            @click=${(e: Event) => e.stopPropagation()}
+          />
+          <button
+            class="session-selector__create-go"
+            @click=${handleCreateSubmit}
+            title="Create agent"
+          >Go</button>
+        </div>`
+        : html`
+        <div
+          class="session-selector__new-agent"
+          @click=${handleShowCreateInput}
+        >
+          + Fire up new agent...
+        </div>`
+    }
+  `;
+}
+
+/** Recomputes options from live state on every render — no stale closures. */
+function rerenderDropdown(state: AppViewState) {
+  if (!_dropdownContainer) {
+    return;
+  }
+  if (!_dropdownOpen) {
+    litRender(nothing, _dropdownContainer);
+    return;
+  }
+  const content = renderDropdownContent(state);
+  litRender(html`<div class="session-selector__dropdown">${content}</div>`, _dropdownContainer);
+}
+
+// Click-outside listener — stores state ref so it can rerender fresh
+let _clickOutsideInstalled = false;
+let _lastState: AppViewState | null = null;
+function installClickOutside() {
+  if (_clickOutsideInstalled) {
+    return;
+  }
+  _clickOutsideInstalled = true;
+  document.addEventListener("click", (e) => {
+    if (!_dropdownOpen) {
+      return;
+    }
+    const target = e.target as HTMLElement;
+    if (target.closest?.(".session-selector")) {
+      return;
+    }
+    closeDropdown();
+    if (_dropdownContainer && _lastState) {
+      rerenderDropdown(_lastState);
+    }
+  });
+}
+
+export function renderSessionSelector(state: AppViewState) {
+  _lastState = state;
+
+  const mainSessionKey = resolveMainSessionKey(state.hello, state.sessionsResult);
+  const sessionOptions = resolveSessionOptions(
+    state.sessionKey,
+    state.sessionsResult,
+    mainSessionKey,
+    state.agentsList,
+  );
+
+  installClickOutside();
+
+  const currentOption = sessionOptions.find((o) => o.key === state.sessionKey);
+  const currentLabel = currentOption?.displayName ?? state.sessionKey;
+
+  const handleToggle = (e: Event) => {
+    e.stopPropagation();
+    if (!state.connected) {
+      return;
+    }
+    _dropdownOpen = !_dropdownOpen;
+    _confirmingKey = null;
+    _creatingAgent = false;
+    const selector = (e.currentTarget as HTMLElement).closest(".session-selector");
+    _dropdownContainer = selector?.querySelector(".session-selector__dropdown-anchor") ?? null;
+    rerenderDropdown(state);
   };
 
   return html`
     <div class="session-selector">
-      <select
-        class="session-selector__select"
-        .value=${state.sessionKey}
+      <button
+        class="session-selector__trigger"
         ?disabled=${!state.connected}
-        @change=${handleSessionChange}
+        @click=${handleToggle}
         title="Switch session"
       >
-        ${repeat(
-          sessionOptions,
-          (entry) => entry.key,
-          (entry) =>
-            html`<option value=${entry.key}>
-              ${entry.displayName ?? entry.key}
-            </option>`,
-        )}
-        <option disabled>──────────</option>
-        <option value=${NEW_AGENT_VALUE}>+ Fire up new agent...</option>
-      </select>
+        ${currentLabel}
+      </button>
       <span class="session-selector__chevron">${icons.chevronDown}</span>
+      <div class="session-selector__dropdown-anchor"></div>
     </div>
   `;
 }

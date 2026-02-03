@@ -173,26 +173,6 @@
   background: var(--bg-subtle);
 }
 
-.session-selector__select {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--font-mono);
-  padding: 0;
-  padding-right: 16px;
-  cursor: pointer;
-  width: 100%;
-  outline: none;
-}
-
-.session-selector__select:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .session-selector__chevron {
   position: absolute;
   right: 8px;
@@ -215,6 +195,210 @@
   stroke-width: 2px;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Custom session dropdown */
+.session-selector__dropdown-anchor {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+}
+
+.session-selector__trigger {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  padding: 0;
+  padding-right: 16px;
+  cursor: pointer;
+  width: 100%;
+  outline: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-selector__trigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.session-selector__dropdown {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  min-width: 100%;
+  max-width: 340px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  padding: 4px;
+}
+
+.session-selector__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) ease;
+  min-height: 30px;
+}
+
+.session-selector__option:hover {
+  background: var(--bg-hover);
+}
+
+.session-selector__option--active {
+  background: var(--accent-subtle);
+}
+
+.session-selector__option--active:hover {
+  background: var(--accent-subtle);
+}
+
+.session-selector__option-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.session-selector__delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--muted);
+  opacity: 0;
+  transition:
+    opacity var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.session-selector__option:hover .session-selector__delete-btn {
+  opacity: 1;
+}
+
+.session-selector__delete-btn:hover {
+  color: var(--danger, #e53e3e);
+  background: var(--bg-hover);
+}
+
+.session-selector__confirm-btn {
+  flex-shrink: 0;
+  background: var(--danger, #e53e3e);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  line-height: 1.4;
+  transition:
+    opacity var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.session-selector__confirm-btn:hover {
+  opacity: 0.85;
+}
+
+.session-selector__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.session-selector__new-agent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.session-selector__new-agent:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.session-selector__create-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.session-selector__create-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  outline: none;
+}
+
+.session-selector__create-input:focus {
+  border-color: var(--accent);
+}
+
+.session-selector__create-go {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  line-height: 1.2;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.session-selector__create-go:hover {
+  opacity: 0.85;
 }
 
 /* Topbar status */

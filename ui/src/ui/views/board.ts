@@ -78,8 +78,10 @@ function openModal(host: { requestUpdate?: () => void }) {
   _modalHost = host;
   host.requestUpdate?.();
   requestAnimationFrame(() => {
-    const input = document.querySelector(".bk-modal__title-input") as HTMLInputElement | null;
-    input?.focus();
+    const input = document.querySelector(".bk-modal__title-input");
+    if (input instanceof HTMLInputElement) {
+      input.focus();
+    }
   });
 }
 
@@ -90,11 +92,15 @@ function closeModal() {
 }
 
 function renderModal(onCreateTicket: (title: string, type: string, intent?: string) => void) {
-  if (!_modalOpen) return nothing;
+  if (!_modalOpen) {
+    return nothing;
+  }
 
   const handleSubmit = () => {
     const title = _modalTitle.trim();
-    if (!title) return;
+    if (!title) {
+      return;
+    }
     const intent = _modalIntent.trim() || undefined;
     onCreateTicket(title, _modalType, intent);
     closeModal();
@@ -132,12 +138,16 @@ function renderModal(onCreateTicket: (title: string, type: string, intent?: stri
             type="text"
             placeholder="What needs to happen?"
             .value=${_modalTitle}
-            @input=${(e: Event) => { _modalTitle = (e.target as HTMLInputElement).value; }}
+            @input=${(e: Event) => {
+              _modalTitle = (e.target as HTMLInputElement).value;
+            }}
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
-                const desc = document.querySelector(".bk-modal__desc-input") as HTMLTextAreaElement | null;
-                desc?.focus();
+                const desc = document.querySelector(".bk-modal__desc-input");
+                if (desc instanceof HTMLTextAreaElement) {
+                  desc.focus();
+                }
               }
             }}
           />
@@ -148,14 +158,19 @@ function renderModal(onCreateTicket: (title: string, type: string, intent?: stri
             placeholder="What should the agent accomplish? What does success look like?"
             rows="10"
             .value=${_modalIntent}
-            @input=${(e: Event) => { _modalIntent = (e.target as HTMLTextAreaElement).value; }}
+            @input=${(e: Event) => {
+              _modalIntent = (e.target as HTMLTextAreaElement).value;
+            }}
           ></textarea>
 
           <label class="bk-modal__label">Type</label>
           <select
             class="bk-modal__select"
             .value=${_modalType}
-            @change=${(e: Event) => { _modalType = (e.target as HTMLSelectElement).value; _modalHost?.requestUpdate?.(); }}
+            @change=${(e: Event) => {
+              _modalType = (e.target as HTMLSelectElement).value;
+              _modalHost?.requestUpdate?.();
+            }}
           >
             <option value="feature">Feature</option>
             <option value="bugfix">Bugfix</option>
@@ -201,19 +216,23 @@ function renderTicketCard(
             ${capitalize(ticket.type)}
           </span>
         </div>
-        <button class="bk-card__menu" @click=${(e: Event) => { e.stopPropagation(); }}>
+        <button class="bk-card__menu" @click=${(e: Event) => {
+          e.stopPropagation();
+        }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
         </button>
       </div>
       <div class="bk-card__title">${ticket.title}</div>
       <div class="bk-card__footer">
         <span class="bk-card__id">${ticket.id}</span>
-        ${commentCount > 0
-          ? html`<span class="bk-card__comments" title="${commentCount} comment${commentCount > 1 ? "s" : ""}">
+        ${
+          commentCount > 0
+            ? html`<span class="bk-card__comments" title="${commentCount} comment${commentCount > 1 ? "s" : ""}">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               ${commentCount}
             </span>`
-          : nothing}
+            : nothing
+        }
       </div>
     </div>
   `;
@@ -271,9 +290,7 @@ function renderColumn(
         </div>
       </div>
       <div class="bk-col__body">
-        ${column.tickets.map((ticket) =>
-          renderTicketCard(ticket, onViewTicket, handleDragStart),
-        )}
+        ${column.tickets.map((ticket) => renderTicketCard(ticket, onViewTicket, handleDragStart))}
       </div>
     </div>
   `;
@@ -856,11 +873,13 @@ export function renderBoard(props: BoardProps) {
             <span class="bk-toolbar__stat">
               <span class="bk-toolbar__stat-val">${props.board.totalTickets}</span> tickets
             </span>
-            ${props.board.staleCount > 0
-              ? html`<span class="bk-toolbar__stat bk-toolbar__stat--warn">
+            ${
+              props.board.staleCount > 0
+                ? html`<span class="bk-toolbar__stat bk-toolbar__stat--warn">
                   <span class="bk-toolbar__stat-val">${props.board.staleCount}</span> stale
                 </span>`
-              : nothing}
+                : nothing
+            }
           </div>
         </div>
         <div class="bk-toolbar__right">

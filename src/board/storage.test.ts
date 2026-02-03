@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   initBoard,
   loadBoard,
@@ -14,7 +14,6 @@ import {
   getTicketsByStatus,
   getBoardSummary,
   getNextWorkItem,
-  getStaleTickets,
   addComment,
 } from "./storage.js";
 
@@ -90,9 +89,9 @@ describe("Board Storage", () => {
     });
 
     it("throws if board not initialized", async () => {
-      await expect(
-        createTicket(testDir, { title: "Test" }),
-      ).rejects.toThrow("Board not initialized");
+      await expect(createTicket(testDir, { title: "Test" })).rejects.toThrow(
+        "Board not initialized",
+      );
     });
   });
 
@@ -113,9 +112,9 @@ describe("Board Storage", () => {
 
     it("throws for non-existent ticket", async () => {
       await initBoard(testDir, "test", "Test");
-      await expect(
-        updateTicket(testDir, "FAKE-999", { title: "Test" }),
-      ).rejects.toThrow("Ticket not found");
+      await expect(updateTicket(testDir, "FAKE-999", { title: "Test" })).rejects.toThrow(
+        "Ticket not found",
+      );
     });
   });
 
@@ -203,9 +202,9 @@ describe("Board Storage", () => {
 
     it("throws for non-existent ticket", async () => {
       await initBoard(testDir, "test", "Test");
-      await expect(
-        addComment(testDir, "FAKE-999", "agent", "Hello"),
-      ).rejects.toThrow("Ticket not found");
+      await expect(addComment(testDir, "FAKE-999", "agent", "Hello")).rejects.toThrow(
+        "Ticket not found",
+      );
     });
   });
 

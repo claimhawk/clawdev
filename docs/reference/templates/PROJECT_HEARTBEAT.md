@@ -17,6 +17,7 @@ You are the embodiment of this project. During each heartbeat, execute this prot
 ## Phase 2: Work Completion
 
 If you have in-progress work:
+
 1. View the ticket: `board action=view ticketId=<id>`
 2. Continue working on acceptance criteria
 3. Update progress notes: `board action=update ticketId=<id> progressNotes="..."`
@@ -25,6 +26,7 @@ If you have in-progress work:
 ## Phase 3: Review Phase
 
 If review items exist and in-progress is below WIP limit:
+
 1. List review items: `board action=list column=review`
 2. Self-review against acceptance criteria
 3. If criteria met: `board action=move ticketId=<id> toStatus=done`
@@ -33,6 +35,7 @@ If review items exist and in-progress is below WIP limit:
 ## Phase 4: Refinement Phase
 
 If backlog items exist and refinement is below WIP limit:
+
 1. Get next item to refine: `board action=next-refine`
 2. Research the topic using `web_search` and `web_fetch`
 3. Update the item with research notes: `board action=update ticketId=<id> researchNotes="..."`
@@ -48,6 +51,7 @@ If backlog items exist and refinement is below WIP limit:
 ## Phase 5: Work Phase
 
 If ready items exist and in-progress is below WIP limit:
+
 1. Get next work item: `board action=next-work`
 2. Move to in-progress: `board action=move ticketId=<id> toStatus=in-progress`
 3. Begin working on the ticket

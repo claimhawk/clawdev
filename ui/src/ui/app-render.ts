@@ -8,6 +8,7 @@ import {
   renderTab,
   renderThemeToggle,
 } from "./app-render.helpers";
+import { loadBoard, moveTicket } from "./controllers/board";
 import { loadChannels } from "./controllers/channels";
 import { loadChatHistory } from "./controllers/chat";
 import {
@@ -39,7 +40,6 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals";
-import { loadBoard, moveTicket } from "./controllers/board";
 import { loadLogs } from "./controllers/logs";
 import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
@@ -180,8 +180,9 @@ export function renderApp(state: AppViewState) {
         </div>
       </aside>
       <main class="content ${isChat ? "content--chat" : ""}">
-        ${state.tab !== "board"
-          ? html`<section class="content-header">
+        ${
+          state.tab !== "board"
+            ? html`<section class="content-header">
               <div>
                 <div class="page-title">${titleForTab(state.tab)}</div>
                 <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -191,9 +192,9 @@ export function renderApp(state: AppViewState) {
                 ${isChat ? renderChatControls(state) : nothing}
               </div>
             </section>`
-          : state.lastError
-            ? html`<div class="pill danger" style="margin-bottom: 8px;">${state.lastError}</div>`
-            : nothing
+            : state.lastError
+              ? html`<div class="pill danger" style="margin-bottom: 8px;">${state.lastError}</div>`
+              : nothing
         }
 
         ${

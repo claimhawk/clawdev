@@ -59,31 +59,31 @@ board action=move ticketId=SEC-001 toStatus=done          # Verified
 
 ## Actions
 
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `init` | Initialize board | `projectId`, `projectName` |
-| `status` | Board overview | - |
-| `list` | List tickets | `column?`, `type?` |
-| `view` | View ticket details | `ticketId` |
-| `create` | Create ticket | `title` |
-| `update` | Update ticket | `ticketId` |
-| `move` | Move to column | `ticketId`, `toStatus` |
-| `delete` | Delete ticket | `ticketId` |
-| `next-work` | Get next ready item | - |
-| `next-refine` | Get next backlog item | - |
-| `stale` | List stale items | - |
-| `blocked` | List blocked items | - |
-| `children` | List child tickets | `ticketId` |
+| Action        | Description           | Required Params            |
+| ------------- | --------------------- | -------------------------- |
+| `init`        | Initialize board      | `projectId`, `projectName` |
+| `status`      | Board overview        | -                          |
+| `list`        | List tickets          | `column?`, `type?`         |
+| `view`        | View ticket details   | `ticketId`                 |
+| `create`      | Create ticket         | `title`                    |
+| `update`      | Update ticket         | `ticketId`                 |
+| `move`        | Move to column        | `ticketId`, `toStatus`     |
+| `delete`      | Delete ticket         | `ticketId`                 |
+| `next-work`   | Get next ready item   | -                          |
+| `next-refine` | Get next backlog item | -                          |
+| `stale`       | List stale items      | -                          |
+| `blocked`     | List blocked items    | -                          |
+| `children`    | List child tickets    | `ticketId`                 |
 
 ## Ticket Types
 
-| Type | Usage |
-|------|-------|
-| `epic` | Large, vague initiatives |
-| `story` | User-facing features |
-| `task` | Concrete work items |
-| `bug` | Defects to fix |
-| `research` | Investigation tasks |
+| Type       | Usage                    |
+| ---------- | ------------------------ |
+| `epic`     | Large, vague initiatives |
+| `story`    | User-facing features     |
+| `task`     | Concrete work items      |
+| `bug`      | Defects to fix           |
+| `research` | Investigation tasks      |
 
 ## Priorities
 
@@ -96,12 +96,12 @@ board action=move ticketId=SEC-001 toStatus=done          # Verified
 
 Default work-in-progress limits:
 
-| Column | Limit |
-|--------|-------|
-| Refinement | 3 |
-| Ready | 10 |
-| In Progress | 2 |
-| Review | 5 |
+| Column      | Limit |
+| ----------- | ----- |
+| Refinement  | 3     |
+| Ready       | 10    |
+| In Progress | 2     |
+| Review      | 5     |
 
 The agent respects these limits to avoid context overload.
 
@@ -143,13 +143,13 @@ Board settings in `board.yaml`:
 
 ```yaml
 settings:
-  autoRefine: true           # Refine during heartbeat
-  autoWork: true             # Work during heartbeat
-  requireReview: true        # Require review before done
-  staleInProgressHours: 24   # Hours before stale warning
-  maxRefinePerHeartbeat: 1   # Refinements per heartbeat
-  maxWorkPerHeartbeat: 1     # Work items per heartbeat
-  ticketPrefix: SEC          # Ticket ID prefix
+  autoRefine: true # Refine during heartbeat
+  autoWork: true # Work during heartbeat
+  requireReview: true # Require review before done
+  staleInProgressHours: 24 # Hours before stale warning
+  maxRefinePerHeartbeat: 1 # Refinements per heartbeat
+  maxWorkPerHeartbeat: 1 # Work items per heartbeat
+  ticketPrefix: SEC # Ticket ID prefix
 ```
 
 ## Example: Security Hardening Project

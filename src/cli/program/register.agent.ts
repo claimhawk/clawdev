@@ -1,13 +1,13 @@
 import type { Command } from "commander";
 import { DEFAULT_CHAT_CHANNEL } from "../../channels/registry.js";
 import { agentCliCommand } from "../../commands/agent-via-gateway.js";
+import { agentsProjectCommand } from "../../commands/agents-project.js";
 import {
   agentsAddCommand,
   agentsDeleteCommand,
   agentsListCommand,
   agentsSetIdentityCommand,
 } from "../../commands/agents.js";
-import { agentsProjectCommand } from "../../commands/agents-project.js";
 import { setVerbose } from "../../globals.js";
 import { defaultRuntime } from "../../runtime.js";
 import { formatDocsLink } from "../../terminal/links.js";
@@ -207,10 +207,7 @@ ${formatHelpExamples([
         `
 ${theme.heading("Examples:")}
 ${formatHelpExamples([
-  [
-    'openclaw agents project "Security Hardening"',
-    "Create a project agent for security work.",
-  ],
+  ['openclaw agents project "Security Hardening"', "Create a project agent for security work."],
   [
     'openclaw agents project "API Refactor" --channel telegram --heartbeat 1h',
     "With Telegram channel and hourly heartbeat.",

@@ -8,7 +8,6 @@ import type { Tab } from "./navigation";
 import type { UiSettings } from "./storage";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
-import type { BoardData } from "./views/board";
 import type {
   AgentsListResult,
   ChannelsStatusSnapshot,
@@ -26,6 +25,7 @@ import type {
   StatusSummary,
 } from "./types";
 import type { ChatAttachment, ChatQueueItem, CronFormState } from "./ui-types";
+import type { BoardData } from "./views/board";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 
 export type AppViewState = {
