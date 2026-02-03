@@ -12,6 +12,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { loadConfig, writeConfigFile } from "../config/config.js";
+import type { AgentConfig } from "../config/types.agents.js";
+import type { AgentBinding } from "../config/types.agents.js";
 import { initBoard } from "../board/storage.js";
 import { resolveUserPath } from "../utils.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -205,7 +207,7 @@ export async function agentsProjectCommand(
 
   // Build agent config
   const heartbeatInterval = opts.heartbeat ?? "30m";
-  const agentConfig: Record<string, unknown> = {
+  const agentConfig: AgentConfig = {
     id: agentId,
     workspace: workspaceDir,
   };
@@ -216,34 +218,30 @@ export async function agentsProjectCommand(
   }
 
   // Add heartbeat configuration
-  const heartbeatConfig: Record<string, unknown> = {
+  agentConfig.heartbeat = {
     every: heartbeatInterval,
+    ...(opts.activeStart && opts.activeEnd
+      ? {
+          activeHours: {
+            start: opts.activeStart,
+            end: opts.activeEnd,
+            ...(opts.timezone ? { timezone: opts.timezone } : {}),
+          },
+        }
+      : {}),
   };
 
-  if (opts.activeStart && opts.activeEnd) {
-    heartbeatConfig.activeHours = {
-      start: opts.activeStart,
-      end: opts.activeEnd,
-      ...(opts.timezone ? { timezone: opts.timezone } : {}),
-    };
-  }
-
-  agentConfig.heartbeat = heartbeatConfig;
-
-  // Add channel binding if specified
+  // Build new bindings array if channel specified
+  let newBindings: AgentBinding[] | undefined;
   if (opts.channel) {
-    const binding: Record<string, unknown> = {
-      channel: opts.channel,
-    };
-    if (opts.accountId) {
-      binding.accountId = opts.accountId;
-    }
-    agentConfig.bindings = [
-      {
-        agentId,
-        match: binding,
+    const binding: AgentBinding = {
+      agentId,
+      match: {
+        channel: opts.channel,
+        ...(opts.accountId ? { accountId: opts.accountId } : {}),
       },
-    ];
+    };
+    newBindings = [...(cfg.bindings ?? []), binding];
   }
 
   // Update config
@@ -253,6 +251,7 @@ export async function agentsProjectCommand(
       ...cfg.agents,
       list: [...existingAgents, agentConfig],
     },
+    ...(newBindings ? { bindings: newBindings } : {}),
   };
 
   await writeConfigFile(updatedConfig);
