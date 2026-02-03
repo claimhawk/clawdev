@@ -241,6 +241,12 @@ export const icons = {
       <rect x="3" y="12" width="7" height="9" rx="1" />
     </svg>
   `,
+  heartPulse: html`
+    <svg viewBox="0 0 24 24">
+      <path d="M19.5 12.572l-7.5 7.428l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.572" />
+      <path d="M5 12h2l2 3l4-6l2 3h4" />
+    </svg>
+  `,
 } as const;
 
 export type IconName = keyof typeof icons;

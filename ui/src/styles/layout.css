@@ -123,6 +123,25 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border-radius: 50%;
+}
+
+/* Dark theme (default): show dark-bg logo, hide light-bg logo */
+.brand-logo__light {
+  display: none;
+}
+
+.brand-logo__dark {
+  display: block;
+}
+
+/* Light theme: swap logos */
+:root[data-theme="light"] .brand-logo__light {
+  display: block;
+}
+
+:root[data-theme="light"] .brand-logo__dark {
+  display: none;
 }
 
 .brand-text {
@@ -149,6 +168,14 @@
 }
 
 /* Session Selector (topbar) */
+.session-selector__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
 .session-selector {
   position: relative;
   display: flex;
@@ -408,25 +435,35 @@
   gap: 8px;
 }
 
-.topbar-status .pill {
-  padding: 6px 10px;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  height: 32px;
-  box-sizing: border-box;
-}
-
-.topbar-status .pill .mono {
+/* Health icon */
+.health-icon {
   display: flex;
   align-items: center;
-  line-height: 1;
-  margin-top: 0px;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: default;
+  transition: color var(--duration-fast) ease;
 }
 
-.topbar-status .statusDot {
-  width: 6px;
-  height: 6px;
+.health-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.health-icon--ok {
+  color: var(--ok);
+}
+
+.health-icon--off {
+  color: var(--danger, #e53e3e);
+  animation: pulse-subtle 2s ease-in-out infinite;
 }
 
 .topbar-status .theme-toggle {

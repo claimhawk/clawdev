@@ -410,7 +410,15 @@ export function renderSessionSelector(state: AppViewState) {
     rerenderDropdown(state);
   };
 
+  // Only show selector when there are multiple agents or sessions
+  const hasMultiple = sessionOptions.length > 1 || (state.agentsList?.agents?.length ?? 0) > 1;
+
+  if (!hasMultiple) {
+    return nothing;
+  }
+
   return html`
+    <span class="session-selector__label">Current Project</span>
     <div class="session-selector">
       <button
         class="session-selector__trigger"

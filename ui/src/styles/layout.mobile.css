@@ -80,19 +80,6 @@
     flex-wrap: nowrap;
   }
 
-  .topbar-status .pill {
-    padding: 4px 8px;
-    font-size: 11px;
-    gap: 4px;
-  }
-
-  .topbar-status .pill .mono {
-    display: none;
-  }
-
-  .topbar-status .pill span:nth-child(2) {
-    display: none;
-  }
 
   /* Nav */
   .nav {
@@ -356,10 +343,6 @@
     font-size: 11px;
   }
 
-  .topbar-status .pill {
-    padding: 3px 6px;
-    font-size: 10px;
-  }
 
   .theme-toggle {
     --theme-item: 22px;

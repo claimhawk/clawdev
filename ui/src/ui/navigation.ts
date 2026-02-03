@@ -4,10 +4,10 @@ export const TAB_GROUPS = [
   { label: "Command", tabs: ["board", "chat"] },
   {
     label: "Control",
-    tabs: ["overview", "channels", "instances", "sessions", "cron"],
+    tabs: ["overview", "instances", "sessions", "cron"],
   },
   { label: "Agent", tabs: ["skills", "nodes"] },
-  { label: "Settings", tabs: ["config", "debug", "logs"] },
+  { label: "Settings", tabs: ["channels", "config", "debug", "logs"] },
 ] as const;
 
 export type Tab =
