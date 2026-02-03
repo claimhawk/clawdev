@@ -15,15 +15,17 @@ import yaml from "yaml";
 import {
   type Board,
   type BoardWithTickets,
+  type CodeLocation,
+  type Comment,
   type Ticket,
   type TicketCreateInput,
   type TicketUpdateInput,
   type TicketStatus,
+  type TicketType,
   type BoardSummary,
   DEFAULT_BOARD_COLUMNS,
   DEFAULT_BOARD_SETTINGS,
   TICKET_STATUS_ORDER,
-  TICKET_PRIORITY_ORDER,
 } from "./types.js";
 
 const BOARD_DIR = "board";
@@ -54,14 +56,86 @@ function parseYamlSafe<T>(content: string, fallback: T): T {
   }
 }
 
-function ageString(isoDate: string): string {
-  const ms = Date.now() - new Date(isoDate).getTime();
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  if (hours < 24) {
-    return `${hours}h`;
+/** Slugify a title for use in branch names / worktree paths */
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+}
+
+/** Derive code location when an agent picks up a story */
+function deriveCodeLocation(ticketId: string, title: string): CodeLocation {
+  const slug = slugify(title);
+  const idLower = ticketId.toLowerCase();
+  return {
+    branch: `story/${idLower}-${slug}`,
+    worktree: `../wt-${idLower}-${slug}`,
+  };
+}
+
+/** Map old ticket types to new ones during lazy migration */
+const TYPE_MIGRATION: Record<string, TicketType> = {
+  epic: "feature",
+  story: "feature",
+  task: "chore",
+  bug: "bugfix",
+  idea: "experiment",
+  research: "experiment",
+};
+
+/** Lazy-migrate a raw ticket from old schema to new */
+function migrateTicket(raw: Record<string, unknown>): Ticket {
+  const ticket = raw as Ticket & Record<string, unknown>;
+
+  // Migrate type
+  const oldType = ticket.type as string;
+  if (oldType && TYPE_MIGRATION[oldType]) {
+    ticket.type = TYPE_MIGRATION[oldType];
   }
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
+
+  // Migrate status: remove "blocked" → "backlog"
+  if ((ticket.status as string) === "blocked") {
+    ticket.status = "backlog";
+  }
+
+  // Migrate description → intent
+  if (ticket.description && !ticket.intent) {
+    ticket.intent = ticket.description as string;
+  }
+
+  // Migrate acceptanceCriteria → acceptanceSignal
+  const ac = ticket.acceptanceCriteria as string[] | undefined;
+  if (ac?.length && !ticket.acceptanceSignal) {
+    ticket.acceptanceSignal = ac.join("\n");
+  }
+
+  // Migrate progressNotes → comments
+  const pn = ticket.progressNotes as string[] | undefined;
+  if (pn?.length && (!ticket.comments || ticket.comments.length === 0)) {
+    ticket.comments = pn.map((text) => ({
+      author: "system",
+      text,
+      createdAt: ticket.updatedAt ?? ticket.createdAt,
+    }));
+  }
+
+  // Clean up removed fields
+  delete ticket.description;
+  delete ticket.acceptanceCriteria;
+  delete ticket.progressNotes;
+  delete ticket.rejectionCount;
+  delete ticket.researchNotes;
+  delete ticket.estimate;
+  delete ticket.parentId;
+  delete ticket.labels;
+  delete ticket.tags;
+  delete ticket.blockedBy;
+  delete ticket.assignee;
+  delete ticket.staleAt;
+
+  return ticket as Ticket;
 }
 
 export async function ensureBoardDir(workspaceDir: string): Promise<string> {
@@ -109,8 +183,10 @@ export async function initBoard(
     return existing;
   }
 
+  const timestamp = now();
   const board: Board = {
-    version: 1,
+    id: sanitizeId(projectId),
+    name: projectName,
     projectId: sanitizeId(projectId),
     projectName,
     columns: DEFAULT_BOARD_COLUMNS,
@@ -118,7 +194,8 @@ export async function initBoard(
       ...DEFAULT_BOARD_SETTINGS,
       ticketPrefix: sanitizeId(projectId).slice(0, 4),
     },
-    updatedAt: now(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
   };
 
   await saveBoard(workspaceDir, board);
@@ -134,7 +211,9 @@ export async function loadTicket(
 
   try {
     const content = await fs.readFile(filePath, "utf-8");
-    return parseYamlSafe<Ticket>(content, null as unknown as Ticket);
+    const raw = parseYamlSafe<Record<string, unknown>>(content, null as unknown as Record<string, unknown>);
+    if (!raw) return null;
+    return migrateTicket(raw);
   } catch (err) {
     const anyErr = err as { code?: string };
     if (anyErr.code === "ENOENT") {
@@ -185,9 +264,9 @@ export async function listTickets(workspaceDir: string): Promise<Ticket[]> {
     for (const file of yamlFiles) {
       try {
         const content = await fs.readFile(path.join(ticketsDir, file), "utf-8");
-        const ticket = parseYamlSafe<Ticket>(content, null as unknown as Ticket);
-        if (ticket?.id) {
-          tickets.push(ticket);
+        const raw = parseYamlSafe<Record<string, unknown>>(content, null as unknown as Record<string, unknown>);
+        if (raw && (raw as { id?: string }).id) {
+          tickets.push(migrateTicket(raw));
         }
       } catch {
         // Skip invalid ticket files
@@ -233,19 +312,15 @@ export async function createTicket(
   const timestamp = now();
   const ticket: Ticket = {
     id: ticketId,
-    parentId: input.parentId,
     title: input.title,
-    type: input.type ?? "task",
+    type: input.type ?? "feature",
     status: "backlog",
-    priority: input.priority ?? "medium",
-    description: input.description ?? "",
-    acceptanceCriteria: input.acceptanceCriteria ?? [],
-    tags: input.tags,
-    estimate: input.estimate,
+    intent: input.intent,
+    acceptanceSignal: input.acceptanceSignal,
+    comments: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     statusChangedAt: timestamp,
-    source: "user",
   };
 
   await saveBoard(workspaceDir, board);
@@ -305,7 +380,22 @@ export async function moveTicket(
   }
 
   const timestamp = now();
-  const fromReview = ticket.status === "review" && toStatus !== "done";
+
+  // Append move note as a comment
+  const comments = ticket.comments ?? [];
+  if (note) {
+    comments.push({
+      author: "system",
+      text: `Moved to ${toStatus}: ${note}`,
+      createdAt: timestamp,
+    });
+  }
+
+  // Derive codeLocation when moving to in-progress
+  const codeLocation =
+    toStatus === "in-progress" && !ticket.codeLocation
+      ? deriveCodeLocation(ticket.id, ticket.title)
+      : ticket.codeLocation;
 
   const updated: Ticket = {
     ...ticket,
@@ -313,12 +403,33 @@ export async function moveTicket(
     updatedAt: timestamp,
     statusChangedAt: timestamp,
     completedAt: toStatus === "done" ? timestamp : ticket.completedAt,
-    rejectionCount: fromReview
-      ? (ticket.rejectionCount ?? 0) + 1
-      : ticket.rejectionCount,
-    progressNotes: note
-      ? `${ticket.progressNotes ?? ""}\n\n[${timestamp}] Moved to ${toStatus}: ${note}`.trim()
-      : ticket.progressNotes,
+    comments,
+    codeLocation,
+  };
+
+  await saveTicket(workspaceDir, updated);
+  return updated;
+}
+
+export async function addComment(
+  workspaceDir: string,
+  ticketId: string,
+  author: string,
+  text: string,
+): Promise<Ticket> {
+  const ticket = await loadTicket(workspaceDir, ticketId);
+  if (!ticket) {
+    throw new Error(`Ticket not found: ${ticketId}`);
+  }
+
+  const timestamp = now();
+  const comments = ticket.comments ?? [];
+  comments.push({ author, text, createdAt: timestamp });
+
+  const updated: Ticket = {
+    ...ticket,
+    comments,
+    updatedAt: timestamp,
   };
 
   await saveTicket(workspaceDir, updated);
@@ -333,13 +444,6 @@ export async function getTicketsByStatus(
   return tickets
     .filter((t) => t.status === status)
     .sort((a, b) => {
-      // Sort by priority first, then by creation date
-      const priorityDiff =
-        TICKET_PRIORITY_ORDER.indexOf(a.priority) -
-        TICKET_PRIORITY_ORDER.indexOf(b.priority);
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 }
@@ -354,27 +458,9 @@ export async function getStaleTickets(
   return tickets.filter(
     (t) =>
       t.status === "in-progress" &&
+      t.statusChangedAt &&
       new Date(t.statusChangedAt).getTime() < cutoff,
   );
-}
-
-export async function getBlockedTickets(workspaceDir: string): Promise<Ticket[]> {
-  const tickets = await listTickets(workspaceDir);
-  const ticketIds = new Set(tickets.map((t) => t.id));
-
-  return tickets.filter((t) => {
-    if (t.status === "blocked") {
-      return true;
-    }
-    // Check if blocked by unfinished tickets
-    if (t.blockedBy?.length) {
-      return t.blockedBy.some((blockerId) => {
-        const blocker = tickets.find((bt) => bt.id === blockerId);
-        return blocker && blocker.status !== "done";
-      });
-    }
-    return false;
-  });
 }
 
 export async function getBoardSummary(
@@ -388,11 +474,10 @@ export async function getBoardSummary(
   const tickets = await listTickets(workspaceDir);
 
   const columnCounts = {} as Record<TicketStatus, number>;
-  for (const status of TICKET_STATUS_ORDER) {
+  for (const status of Object.keys(TICKET_STATUS_ORDER) as TicketStatus[]) {
     columnCounts[status] = tickets.filter((t) => t.status === status).length;
   }
 
-  const blockedTickets = await getBlockedTickets(workspaceDir);
   const staleTickets = await getStaleTickets(
     workspaceDir,
     board.settings.staleInProgressHours,
@@ -404,24 +489,33 @@ export async function getBoardSummary(
 
   const inProgressTickets = tickets
     .filter((t) => t.status === "in-progress")
-    .sort(
-      (a, b) =>
-        new Date(a.statusChangedAt).getTime() - new Date(b.statusChangedAt).getTime(),
-    );
+    .sort((a, b) => {
+      const aTime = a.statusChangedAt ? new Date(a.statusChangedAt).getTime() : 0;
+      const bTime = b.statusChangedAt ? new Date(b.statusChangedAt).getTime() : 0;
+      return aTime - bTime;
+    });
+
+  const oldestBacklogAgeMs = backlogTickets[0]
+    ? Date.now() - new Date(backlogTickets[0].createdAt).getTime()
+    : null;
+
+  const oldestInProgressAgeMs =
+    inProgressTickets[0]?.statusChangedAt
+      ? Date.now() - new Date(inProgressTickets[0].statusChangedAt).getTime()
+      : null;
 
   return {
-    projectId: board.projectId,
+    id: board.id,
+    name: board.name,
     projectName: board.projectName,
-    columnCounts,
-    blockedCount: blockedTickets.length,
-    staleCount: staleTickets.length,
+    ticketCount: tickets.length,
     totalTickets: tickets.length,
-    oldestBacklogAge: backlogTickets[0]
-      ? ageString(backlogTickets[0].createdAt)
-      : undefined,
-    oldestInProgressAge: inProgressTickets[0]
-      ? ageString(inProgressTickets[0].statusChangedAt)
-      : undefined,
+    openCount: tickets.filter((t) => t.status !== "done").length,
+    completedCount: tickets.filter((t) => t.status === "done").length,
+    staleCount: staleTickets.length,
+    oldestBacklogAge: oldestBacklogAgeMs,
+    oldestInProgressAge: oldestInProgressAgeMs,
+    columnCounts,
   };
 }
 
@@ -442,41 +536,7 @@ export async function getNextWorkItem(
     }
   }
 
-  // Get highest priority ready item
+  // Get first ready item (sorted by creation date)
   const ready = await getTicketsByStatus(workspaceDir, "ready");
   return ready[0] ?? null;
-}
-
-export async function getNextRefinementItem(
-  workspaceDir: string,
-): Promise<Ticket | null> {
-  const board = await loadBoard(workspaceDir);
-  if (!board) {
-    return null;
-  }
-
-  // Check WIP limit for refinement
-  const refinementColumn = board.columns.find((c) => c.id === "refinement");
-  if (refinementColumn?.wipLimit) {
-    const inRefinement = await getTicketsByStatus(workspaceDir, "refinement");
-    if (inRefinement.length >= refinementColumn.wipLimit) {
-      return null; // At capacity
-    }
-  }
-
-  // Get oldest backlog item (epics/stories first)
-  const backlog = await getTicketsByStatus(workspaceDir, "backlog");
-  const epicsAndStories = backlog.filter(
-    (t) => t.type === "epic" || t.type === "story",
-  );
-
-  return epicsAndStories[0] ?? backlog[0] ?? null;
-}
-
-export async function getChildTickets(
-  workspaceDir: string,
-  parentId: string,
-): Promise<Ticket[]> {
-  const tickets = await listTickets(workspaceDir);
-  return tickets.filter((t) => t.parentId === parentId);
 }

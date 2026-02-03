@@ -1,7 +1,7 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "Chat", tabs: ["chat"] },
+  { label: "Command", tabs: ["board", "chat"] },
   {
     label: "Control",
     tabs: ["overview", "channels", "instances", "sessions", "cron"],
@@ -11,6 +11,7 @@ export const TAB_GROUPS = [
 ] as const;
 
 export type Tab =
+  | "board"
   | "overview"
   | "channels"
   | "instances"
@@ -24,6 +25,7 @@ export type Tab =
   | "logs";
 
 const TAB_PATHS: Record<Tab, string> = {
+  board: "/board",
   overview: "/overview",
   channels: "/channels",
   instances: "/instances",
@@ -120,6 +122,8 @@ export function inferBasePathFromPathname(pathname: string): string {
 
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
+    case "board":
+      return "layoutGrid";
     case "chat":
       return "messageSquare";
     case "overview":
@@ -149,6 +153,8 @@ export function iconForTab(tab: Tab): IconName {
 
 export function titleForTab(tab: Tab) {
   switch (tab) {
+    case "board":
+      return "Board";
     case "overview":
       return "Overview";
     case "channels":
@@ -178,6 +184,8 @@ export function titleForTab(tab: Tab) {
 
 export function subtitleForTab(tab: Tab) {
   switch (tab) {
+    case "board":
+      return "Kanban board for managing agent tasks and projects.";
     case "overview":
       return "Gateway status, entry points, and a fast health read.";
     case "channels":

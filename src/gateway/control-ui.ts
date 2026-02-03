@@ -17,9 +17,16 @@ export type ControlUiRequestOptions = {
   basePath?: string;
   config?: OpenClawConfig;
   agentId?: string;
+  gatewayToken?: string;
 };
 
 function resolveControlUiRoot(): string | null {
+  // Allow override via environment variable for Docker/dev
+  const envOverride = process.env.OPENCLAW_CONTROL_UI_PATH;
+  if (envOverride && fs.existsSync(path.join(envOverride, "index.html"))) {
+    return envOverride;
+  }
+
   const here = path.dirname(fileURLToPath(import.meta.url));
   const execDir = (() => {
     try {
@@ -177,10 +184,11 @@ interface ControlUiInjectionOpts {
   basePath: string;
   assistantName?: string;
   assistantAvatar?: string;
+  gatewayToken?: string;
 }
 
 function injectControlUiConfig(html: string, opts: ControlUiInjectionOpts): string {
-  const { basePath, assistantName, assistantAvatar } = opts;
+  const { basePath, assistantName, assistantAvatar, gatewayToken } = opts;
   const script =
     `<script>` +
     `window.__OPENCLAW_CONTROL_UI_BASE_PATH__=${JSON.stringify(basePath)};` +
@@ -190,6 +198,7 @@ function injectControlUiConfig(html: string, opts: ControlUiInjectionOpts): stri
     `window.__OPENCLAW_ASSISTANT_AVATAR__=${JSON.stringify(
       assistantAvatar ?? DEFAULT_ASSISTANT_IDENTITY.avatar,
     )};` +
+    (gatewayToken ? `window.__OPENCLAW_GATEWAY_TOKEN__=${JSON.stringify(gatewayToken)};` : "") +
     `</script>`;
   // Check if already injected
   if (html.includes("__OPENCLAW_ASSISTANT_NAME__")) {
@@ -206,10 +215,11 @@ interface ServeIndexHtmlOpts {
   basePath: string;
   config?: OpenClawConfig;
   agentId?: string;
+  gatewayToken?: string;
 }
 
 function serveIndexHtml(res: ServerResponse, indexPath: string, opts: ServeIndexHtmlOpts) {
-  const { basePath, config, agentId } = opts;
+  const { basePath, config, agentId, gatewayToken } = opts;
   const identity = config
     ? resolveAssistantIdentity({ cfg: config, agentId })
     : DEFAULT_ASSISTANT_IDENTITY;
@@ -231,6 +241,7 @@ function serveIndexHtml(res: ServerResponse, indexPath: string, opts: ServeIndex
       basePath,
       assistantName: identity.name,
       assistantAvatar: avatarValue,
+      gatewayToken,
     }),
   );
 }
@@ -329,6 +340,7 @@ export function handleControlUiHttpRequest(
         basePath,
         config: opts?.config,
         agentId: opts?.agentId,
+        gatewayToken: opts?.gatewayToken,
       });
       return true;
     }
@@ -343,6 +355,7 @@ export function handleControlUiHttpRequest(
       basePath,
       config: opts?.config,
       agentId: opts?.agentId,
+      gatewayToken: opts?.gatewayToken,
     });
     return true;
   }

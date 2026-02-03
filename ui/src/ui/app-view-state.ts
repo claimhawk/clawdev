@@ -8,6 +8,7 @@ import type { Tab } from "./navigation";
 import type { UiSettings } from "./storage";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
+import type { BoardData } from "./views/board";
 import type {
   AgentsListResult,
   ChannelsStatusSnapshot,
@@ -58,6 +59,9 @@ export type AppViewState = {
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
   scrollToBottom: () => void;
+  boardLoading: boolean;
+  board: BoardData | null;
+  boardError: string | null;
   devicesLoading: boolean;
   devicesError: string | null;
   devicesList: DevicePairingList | null;
@@ -205,4 +209,8 @@ export type AppViewState = {
   handleLogsLevelFilterToggle: (level: LogLevel) => void;
   handleLogsAutoFollowToggle: (next: boolean) => void;
   handleCallDebugMethod: (method: string, params: string) => Promise<void>;
+  handleLoadBoard: () => Promise<void>;
+  handleMoveTicket: (ticketId: string, toStatus: string) => Promise<void>;
+  handleCreateTicket: (title: string, type: string, intent?: string) => Promise<void>;
+  handleViewTicket: (ticketId: string) => void;
 };

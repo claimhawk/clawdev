@@ -30,6 +30,7 @@ import {
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
+import { isLocalDirectRequest } from "./auth.js";
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
 
@@ -297,10 +298,14 @@ export function createGatewayHttpServer(opts: {
         ) {
           return;
         }
+        // Auto-inject gateway token for localhost requests so the UI can connect without manual config
+        const isLocalhost = isLocalDirectRequest(req, trustedProxies);
+        const gatewayToken = isLocalhost && resolvedAuth.token ? resolvedAuth.token : undefined;
         if (
           handleControlUiHttpRequest(req, res, {
             basePath: controlUiBasePath,
             config: configSnapshot,
+            gatewayToken,
           })
         ) {
           return;

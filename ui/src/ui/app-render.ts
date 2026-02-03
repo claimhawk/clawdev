@@ -2,7 +2,12 @@ import { html, nothing } from "lit";
 import type { AppViewState } from "./app-view-state";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChatAvatar } from "./app-chat";
-import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
+import {
+  renderChatControls,
+  renderSessionSelector,
+  renderTab,
+  renderThemeToggle,
+} from "./app-render.helpers";
 import { loadChannels } from "./controllers/channels";
 import { loadChatHistory } from "./controllers/chat";
 import {
@@ -34,6 +39,7 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals";
+import { loadBoard, moveTicket } from "./controllers/board";
 import { loadLogs } from "./controllers/logs";
 import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
@@ -47,6 +53,7 @@ import {
 } from "./controllers/skills";
 import { icons } from "./icons";
 import { TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation";
+import { renderBoard } from "./views/board";
 import { renderChannels } from "./views/channels";
 import { renderChat } from "./views/chat";
 import { renderConfig } from "./views/config";
@@ -118,6 +125,7 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
         <div class="topbar-status">
+          ${renderSessionSelector(state)}
           <div class="pill">
             <span class="statusDot ${state.connected ? "ok" : ""}"></span>
             <span>Health</span>
@@ -172,16 +180,38 @@ export function renderApp(state: AppViewState) {
         </div>
       </aside>
       <main class="content ${isChat ? "content--chat" : ""}">
-        <section class="content-header">
-          <div>
-            <div class="page-title">${titleForTab(state.tab)}</div>
-            <div class="page-sub">${subtitleForTab(state.tab)}</div>
-          </div>
-          <div class="page-meta">
-            ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
-            ${isChat ? renderChatControls(state) : nothing}
-          </div>
-        </section>
+        ${state.tab !== "board"
+          ? html`<section class="content-header">
+              <div>
+                <div class="page-title">${titleForTab(state.tab)}</div>
+                <div class="page-sub">${subtitleForTab(state.tab)}</div>
+              </div>
+              <div class="page-meta">
+                ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
+                ${isChat ? renderChatControls(state) : nothing}
+              </div>
+            </section>`
+          : state.lastError
+            ? html`<div class="pill danger" style="margin-bottom: 8px;">${state.lastError}</div>`
+            : nothing
+        }
+
+        ${
+          state.tab === "board"
+            ? renderBoard({
+                loading: state.boardLoading,
+                connected: state.connected,
+                board: state.board,
+                error: state.boardError,
+                sessionKey: state.sessionKey,
+                onRefresh: () => loadBoard(state),
+                onMoveTicket: (ticketId, toStatus) => moveTicket(state, ticketId, toStatus),
+                onCreateTicket: (title, type, intent) =>
+                  state.handleCreateTicket(title, type, intent),
+                onViewTicket: (ticketId) => state.handleViewTicket(ticketId),
+              })
+            : nothing
+        }
 
         ${
           state.tab === "overview"

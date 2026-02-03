@@ -8,9 +8,13 @@ services:
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      # Set to /data/control-ui if mounting local UI for dev
+      OPENCLAW_CONTROL_UI_PATH: ${OPENCLAW_CONTROL_UI_PATH:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      # For local UI development, mount dist/control-ui:
+      # - ./dist/control-ui:/data/control-ui:ro
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"

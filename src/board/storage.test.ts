@@ -14,10 +14,8 @@ import {
   getTicketsByStatus,
   getBoardSummary,
   getNextWorkItem,
-  getNextRefinementItem,
   getStaleTickets,
-  getBlockedTickets,
-  getChildTickets,
+  addComment,
 } from "./storage.js";
 
 describe("Board Storage", () => {
@@ -34,7 +32,7 @@ describe("Board Storage", () => {
       expect(board.projectId).toBe("TEST-PROJECT");
       expect(board.projectName).toBe("Test Project");
       expect(board.settings.ticketPrefix).toBe("TEST");
-      expect(board.columns.length).toBe(6);
+      expect(board.columns.length).toBe(5);
     });
 
     it("returns existing board if already initialized", async () => {
@@ -65,15 +63,14 @@ describe("Board Storage", () => {
       await initBoard(testDir, "test", "Test");
       const ticket = await createTicket(testDir, {
         title: "Fix the bug",
-        type: "bug",
-        priority: "high",
+        type: "bugfix",
       });
 
       expect(ticket.id).toBe("TEST-001");
       expect(ticket.title).toBe("Fix the bug");
-      expect(ticket.type).toBe("bug");
-      expect(ticket.priority).toBe("high");
+      expect(ticket.type).toBe("bugfix");
       expect(ticket.status).toBe("backlog");
+      expect(ticket.comments).toEqual([]);
     });
 
     it("increments ticket numbers", async () => {
@@ -83,6 +80,13 @@ describe("Board Storage", () => {
 
       expect(first.id).toBe("TEST-001");
       expect(second.id).toBe("TEST-002");
+    });
+
+    it("defaults type to feature", async () => {
+      await initBoard(testDir, "test", "Test");
+      const ticket = await createTicket(testDir, { title: "New thing" });
+
+      expect(ticket.type).toBe("feature");
     });
 
     it("throws if board not initialized", async () => {
@@ -99,13 +103,11 @@ describe("Board Storage", () => {
 
       const updated = await updateTicket(testDir, ticket.id, {
         title: "Updated",
-        priority: "critical",
-        researchNotes: "Found something interesting",
+        intent: "Build the feature",
       });
 
       expect(updated.title).toBe("Updated");
-      expect(updated.priority).toBe("critical");
-      expect(updated.researchNotes).toBe("Found something interesting");
+      expect(updated.intent).toBe("Build the feature");
       expect(updated.status).toBe("backlog"); // Status unchanged
     });
 
@@ -139,14 +141,71 @@ describe("Board Storage", () => {
       expect(done.completedAt).toBeDefined();
     });
 
-    it("increments rejection count when moved from review", async () => {
+    it("appends note as comment when moving", async () => {
       await initBoard(testDir, "test", "Test");
       const ticket = await createTicket(testDir, { title: "Test" });
-      await moveTicket(testDir, ticket.id, "review");
 
-      const rejected = await moveTicket(testDir, ticket.id, "in-progress");
+      const moved = await moveTicket(testDir, ticket.id, "ready", "Refined and ready");
 
-      expect(rejected.rejectionCount).toBe(1);
+      expect(moved.comments).toHaveLength(1);
+      expect(moved.comments![0].text).toContain("Refined and ready");
+      expect(moved.comments![0].author).toBe("system");
+    });
+
+    it("derives codeLocation when moving to in-progress", async () => {
+      await initBoard(testDir, "test", "Test");
+      const ticket = await createTicket(testDir, { title: "Add user auth" });
+      await moveTicket(testDir, ticket.id, "ready");
+
+      const inProgress = await moveTicket(testDir, ticket.id, "in-progress");
+
+      expect(inProgress.codeLocation).toBeDefined();
+      expect(inProgress.codeLocation!.branch).toMatch(/^story\/test-001-add-user-auth/);
+      expect(inProgress.codeLocation!.worktree).toMatch(/^\.\.\/wt-test-001-add-user-auth/);
+    });
+
+    it("preserves existing codeLocation on subsequent moves", async () => {
+      await initBoard(testDir, "test", "Test");
+      const ticket = await createTicket(testDir, { title: "Feature" });
+      const inProgress = await moveTicket(testDir, ticket.id, "in-progress");
+      const originalLocation = inProgress.codeLocation;
+
+      const review = await moveTicket(testDir, ticket.id, "review");
+
+      expect(review.codeLocation).toEqual(originalLocation);
+    });
+  });
+
+  describe("addComment", () => {
+    it("adds a comment to a ticket", async () => {
+      await initBoard(testDir, "test", "Test");
+      const ticket = await createTicket(testDir, { title: "Test" });
+
+      const updated = await addComment(testDir, ticket.id, "agent", "Started working on this");
+
+      expect(updated.comments).toHaveLength(1);
+      expect(updated.comments![0].author).toBe("agent");
+      expect(updated.comments![0].text).toBe("Started working on this");
+      expect(updated.comments![0].createdAt).toBeDefined();
+    });
+
+    it("appends to existing comments", async () => {
+      await initBoard(testDir, "test", "Test");
+      const ticket = await createTicket(testDir, { title: "Test" });
+      await addComment(testDir, ticket.id, "agent", "First note");
+
+      const updated = await addComment(testDir, ticket.id, "human", "Second note");
+
+      expect(updated.comments).toHaveLength(2);
+      expect(updated.comments![0].text).toBe("First note");
+      expect(updated.comments![1].text).toBe("Second note");
+    });
+
+    it("throws for non-existent ticket", async () => {
+      await initBoard(testDir, "test", "Test");
+      await expect(
+        addComment(testDir, "FAKE-999", "agent", "Hello"),
+      ).rejects.toThrow("Ticket not found");
     });
   });
 
@@ -182,18 +241,17 @@ describe("Board Storage", () => {
   });
 
   describe("getTicketsByStatus", () => {
-    it("filters by status and sorts by priority", async () => {
+    it("filters by status and sorts by creation date", async () => {
       await initBoard(testDir, "test", "Test");
-      await createTicket(testDir, { title: "Low", priority: "low" });
-      await createTicket(testDir, { title: "High", priority: "high" });
-      await createTicket(testDir, { title: "Critical", priority: "critical" });
+      await createTicket(testDir, { title: "First" });
+      await createTicket(testDir, { title: "Second" });
+      await createTicket(testDir, { title: "Third" });
 
       const tickets = await getTicketsByStatus(testDir, "backlog");
 
       expect(tickets.length).toBe(3);
-      expect(tickets[0].priority).toBe("critical");
-      expect(tickets[1].priority).toBe("high");
-      expect(tickets[2].priority).toBe("low");
+      expect(tickets[0].title).toBe("First");
+      expect(tickets[2].title).toBe("Third");
     });
   });
 
@@ -214,16 +272,16 @@ describe("Board Storage", () => {
   });
 
   describe("getNextWorkItem", () => {
-    it("returns highest priority ready item", async () => {
+    it("returns first ready item", async () => {
       await initBoard(testDir, "test", "Test");
-      const low = await createTicket(testDir, { title: "Low", priority: "low" });
-      const high = await createTicket(testDir, { title: "High", priority: "high" });
-      await moveTicket(testDir, low.id, "ready");
-      await moveTicket(testDir, high.id, "ready");
+      const first = await createTicket(testDir, { title: "First" });
+      const second = await createTicket(testDir, { title: "Second" });
+      await moveTicket(testDir, first.id, "ready");
+      await moveTicket(testDir, second.id, "ready");
 
       const next = await getNextWorkItem(testDir);
 
-      expect(next?.id).toBe(high.id);
+      expect(next?.id).toBe(first.id);
     });
 
     it("returns null when at WIP limit", async () => {
@@ -239,33 +297,6 @@ describe("Board Storage", () => {
       const next = await getNextWorkItem(testDir);
 
       expect(next).toBeNull();
-    });
-  });
-
-  describe("getNextRefinementItem", () => {
-    it("prioritizes epics and stories", async () => {
-      await initBoard(testDir, "test", "Test");
-      await createTicket(testDir, { title: "Task", type: "task" });
-      const epic = await createTicket(testDir, { title: "Epic", type: "epic" });
-
-      const next = await getNextRefinementItem(testDir);
-
-      expect(next?.id).toBe(epic.id);
-    });
-  });
-
-  describe("getChildTickets", () => {
-    it("returns tickets with matching parentId", async () => {
-      await initBoard(testDir, "test", "Test");
-      const parent = await createTicket(testDir, { title: "Parent", type: "epic" });
-      await createTicket(testDir, { title: "Child 1", parentId: parent.id });
-      await createTicket(testDir, { title: "Child 2", parentId: parent.id });
-      await createTicket(testDir, { title: "Unrelated" });
-
-      const children = await getChildTickets(testDir, parent.id);
-
-      expect(children.length).toBe(2);
-      expect(children.every((t) => t.parentId === parent.id)).toBe(true);
     });
   });
 });

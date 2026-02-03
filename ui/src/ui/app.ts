@@ -206,6 +206,10 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
 
+  @state() boardLoading = false;
+  @state() board: import("./views/board").BoardData | null = null;
+  @state() boardError: string | null = null;
+
   @state() cronLoading = false;
   @state() cronJobs: CronJob[] = [];
   @state() cronStatus: CronStatus | null = null;
@@ -487,6 +491,26 @@ export class OpenClawApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  async handleLoadBoard() {
+    const { loadBoard } = await import("./controllers/board");
+    await loadBoard(this as unknown as AppViewState);
+  }
+
+  async handleMoveTicket(ticketId: string, toStatus: string) {
+    const { moveTicket } = await import("./controllers/board");
+    await moveTicket(this as unknown as AppViewState, ticketId, toStatus);
+  }
+
+  async handleCreateTicket(title: string, type: string, intent?: string) {
+    const { createTicket } = await import("./controllers/board");
+    await createTicket(this as unknown as AppViewState, title, type, intent);
+  }
+
+  handleViewTicket(ticketId: string) {
+    // For now, just log the ticket ID. Later, this could open a modal or navigate.
+    console.log("[board] View ticket:", ticketId);
   }
 
   render() {

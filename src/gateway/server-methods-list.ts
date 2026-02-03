@@ -82,6 +82,14 @@ const BASE_METHODS = [
   "chat.history",
   "chat.abort",
   "chat.send",
+  // Board methods
+  "board.init",
+  "board.status",
+  "board.list",
+  "board.view",
+  "board.update",
+  "board.create",
+  "board.move",
 ];
 
 export function listGatewayMethods(): string[] {

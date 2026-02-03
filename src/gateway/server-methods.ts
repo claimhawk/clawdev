@@ -2,6 +2,7 @@ import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-met
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import { agentHandlers } from "./server-methods/agent.js";
 import { agentsHandlers } from "./server-methods/agents.js";
+import { boardMethods } from "./server-methods/board.js";
 import { browserHandlers } from "./server-methods/browser.js";
 import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
@@ -72,6 +73,8 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
+  "board.status",
+  "board.list",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -88,6 +91,9 @@ const WRITE_METHODS = new Set([
   "chat.send",
   "chat.abort",
   "browser.request",
+  "board.init",
+  "board.create",
+  "board.move",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -164,6 +170,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...logsHandlers,
   ...voicewakeHandlers,
   ...healthHandlers,
+  ...boardMethods,
   ...channelsHandlers,
   ...chatHandlers,
   ...cronHandlers,

@@ -207,7 +207,9 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
   const hasToken = typeof tokenValue === "string" && tokenValue.trim().length > 0;
   const hasPassword = typeof passwordValue === "string" && passwordValue.trim().length > 0;
   const hasSharedSecret =
-    (resolvedAuthMode === "token" && hasToken) || (resolvedAuthMode === "password" && hasPassword);
+    resolvedAuthMode === "none" ||
+    (resolvedAuthMode === "token" && hasToken) ||
+    (resolvedAuthMode === "password" && hasPassword);
   const authHints: string[] = [];
   if (miskeys.hasGatewayToken) {
     authHints.push('Found "gateway.token" in config. Use "gateway.auth.token" instead.');

@@ -1,14 +1,143 @@
-import { html } from "lit";
+import { html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import type { AppViewState } from "./app-view-state";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
-import type { SessionsListResult } from "./types";
+import type { AgentsListResult, SessionsListResult } from "./types";
 import { refreshChat } from "./app-chat";
 import { syncUrlWithSessionKey } from "./app-settings";
+import { loadAgents } from "./controllers/agents";
 import { loadChatHistory } from "./controllers/chat";
+import { loadSessions } from "./controllers/sessions";
 import { icons } from "./icons";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation";
+import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
+
+/**
+ * Renders the global session selector in the topbar.
+ * Available on all pages to switch between agent sessions.
+ */
+const NEW_AGENT_VALUE = "__new_agent__";
+
+function switchToSession(state: AppViewState, next: string) {
+  state.sessionKey = next;
+  state.chatMessage = "";
+  state.chatStream = null;
+  state.chatStreamStartedAt = null;
+  state.chatRunId = null;
+  state.resetToolStream();
+  state.resetChatScroll();
+  state.applySettings({
+    ...state.settings,
+    sessionKey: next,
+    lastActiveSessionKey: next,
+  });
+  void state.loadAssistantIdentity();
+  syncUrlWithSessionKey(state, next, true);
+  void loadChatHistory(state);
+  void state.handleLoadBoard?.();
+  void loadSessions(state);
+}
+
+export function renderSessionSelector(state: AppViewState) {
+  const mainSessionKey = resolveMainSessionKey(state.hello, state.sessionsResult);
+  const sessionOptions = resolveSessionOptions(
+    state.sessionKey,
+    state.sessionsResult,
+    mainSessionKey,
+    state.agentsList,
+  );
+
+  const handleSessionChange = async (e: Event) => {
+    const select = e.target as HTMLSelectElement;
+    const next = select.value;
+
+    if (next === NEW_AGENT_VALUE) {
+      // Reset select to current value immediately
+      select.value = state.sessionKey;
+
+      const projectName = window.prompt("Agent name:");
+      if (!projectName?.trim()) {
+        return;
+      }
+
+      const agentId = projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      if (!agentId) {
+        return;
+      }
+
+      try {
+        // Get current config + baseHash for optimistic concurrency
+        const snapshot = await state.client?.request<{
+          config: { agents?: { list?: Array<{ id: string; name?: string }> } };
+          baseHash: string;
+        }>("config.get", {});
+
+        const existingAgents = snapshot?.config?.agents?.list ?? [];
+        if (existingAgents.some((a) => a.id === agentId)) {
+          // Agent already exists, just switch
+          switchToSession(state, `agent:${agentId}:main`);
+          return;
+        }
+
+        const updatedList = [...existingAgents, { id: agentId, name: projectName.trim() }];
+        const newSessionKey = `agent:${agentId}:main`;
+
+        // Switch session immediately so it persists in settings.
+        // config.patch triggers a gateway restart, which drops the WS
+        // connection. The reconnect handler will re-load agents and
+        // chat history with the new session key already set.
+        switchToSession(state, newSessionKey);
+
+        await state.client?.request("config.patch", {
+          raw: JSON.stringify({ agents: { list: updatedList } }),
+          baseHash: snapshot?.baseHash,
+        });
+
+        // Try to load agents now, but the gateway may be restarting.
+        // If this fails, the reconnect handler will pick it up.
+        try {
+          await loadAgents(state);
+        } catch {
+          // Expected during gateway restart
+        }
+      } catch (err) {
+        console.error("[session-selector] Failed to create agent:", err);
+      }
+      return;
+    }
+
+    switchToSession(state, next);
+  };
+
+  return html`
+    <div class="session-selector">
+      <select
+        class="session-selector__select"
+        .value=${state.sessionKey}
+        ?disabled=${!state.connected}
+        @change=${handleSessionChange}
+        title="Switch session"
+      >
+        ${repeat(
+          sessionOptions,
+          (entry) => entry.key,
+          (entry) =>
+            html`<option value=${entry.key}>
+              ${entry.displayName ?? entry.key}
+            </option>`,
+        )}
+        <option disabled>──────────</option>
+        <option value=${NEW_AGENT_VALUE}>+ Fire up new agent...</option>
+      </select>
+      <span class="session-selector__chevron">${icons.chevronDown}</span>
+    </div>
+  `;
+}
 
 export function renderTab(state: AppViewState, tab: Tab) {
   const href = pathForTab(tab, state.basePath);
@@ -39,12 +168,6 @@ export function renderTab(state: AppViewState, tab: Tab) {
 }
 
 export function renderChatControls(state: AppViewState) {
-  const mainSessionKey = resolveMainSessionKey(state.hello, state.sessionsResult);
-  const sessionOptions = resolveSessionOptions(
-    state.sessionKey,
-    state.sessionsResult,
-    mainSessionKey,
-  );
   const disableThinkingToggle = state.onboarding;
   const disableFocusToggle = state.onboarding;
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
@@ -85,39 +208,6 @@ export function renderChatControls(state: AppViewState) {
   `;
   return html`
     <div class="chat-controls">
-      <label class="field chat-controls__session">
-        <select
-          .value=${state.sessionKey}
-          ?disabled=${!state.connected}
-          @change=${(e: Event) => {
-            const next = (e.target as HTMLSelectElement).value;
-            state.sessionKey = next;
-            state.chatMessage = "";
-            state.chatStream = null;
-            state.chatStreamStartedAt = null;
-            state.chatRunId = null;
-            state.resetToolStream();
-            state.resetChatScroll();
-            state.applySettings({
-              ...state.settings,
-              sessionKey: next,
-              lastActiveSessionKey: next,
-            });
-            void state.loadAssistantIdentity();
-            syncUrlWithSessionKey(state, next, true);
-            void loadChatHistory(state);
-          }}
-        >
-          ${repeat(
-            sessionOptions,
-            (entry) => entry.key,
-            (entry) =>
-              html`<option value=${entry.key}>
-                ${entry.displayName ?? entry.key}
-              </option>`,
-          )}
-        </select>
-      </label>
       <button
         class="btn btn--sm btn--icon"
         ?disabled=${state.chatLoading || !state.connected}
@@ -216,6 +306,7 @@ function resolveSessionOptions(
   sessionKey: string,
   sessions: SessionsListResult | null,
   mainSessionKey?: string | null,
+  agentsList?: AgentsListResult | null,
 ) {
   const seen = new Set<string>();
   const options: Array<{ key: string; displayName?: string }> = [];
@@ -249,6 +340,21 @@ function resolveSessionOptions(
         options.push({
           key: s.key,
           displayName: resolveSessionDisplayName(s.key, s),
+        });
+      }
+    }
+  }
+
+  // Merge configured agents so they always appear regardless of activity recency
+  if (agentsList?.agents) {
+    for (const agent of agentsList.agents) {
+      const agentKey = `agent:${agent.id}:main`;
+      if (!seen.has(agentKey)) {
+        seen.add(agentKey);
+        const displayName = agent.name ?? agent.identity?.name ?? agent.id;
+        options.push({
+          key: agentKey,
+          displayName: `${displayName} (${agentKey})`,
         });
       }
     }

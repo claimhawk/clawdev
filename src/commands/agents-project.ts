@@ -119,15 +119,7 @@ If review items exist:
 2. If criteria met, move to done
 3. If not met, move back to in-progress with notes
 
-## Phase 4: Refinement Phase
-
-If backlog has epics/stories and refinement is below WIP limit:
-1. Get next item: \`board action=next-refine\`
-2. Research using \`web_search\`
-3. Break into concrete tasks with acceptance criteria
-4. Move tasks to ready
-
-## Phase 5: Work Phase
+## Phase 4: Work Phase
 
 If ready items exist and in-progress below WIP limit:
 1. Get next work item: \`board action=next-work\`
@@ -153,7 +145,7 @@ This file accumulates knowledge, decisions, and learnings across sessions.
 
 ## Research Findings
 
-<!-- Summarize research findings from ticket refinement -->
+<!-- Summarize research findings -->
 
 ## Lessons Learned
 

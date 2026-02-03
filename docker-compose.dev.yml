@@ -1,0 +1,13 @@
+# Development compose override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# This mounts the local dist/control-ui folder so you can rebuild the UI
+# without rebuilding the Docker image. Run `pnpm ui:build` on the host
+# and the changes will be served immediately.
+
+services:
+  openclaw-gateway:
+    environment:
+      OPENCLAW_CONTROL_UI_PATH: /data/control-ui
+    volumes:
+      - ./dist/control-ui:/data/control-ui:ro

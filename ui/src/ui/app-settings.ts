@@ -18,6 +18,7 @@ import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadSessions } from "./controllers/sessions";
 import { loadSkills } from "./controllers/skills";
+import { loadBoard } from "./controllers/board";
 import {
   inferBasePathFromPathname,
   normalizeBasePath,
@@ -190,6 +191,9 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadDevices(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
     await loadExecApprovals(host as unknown as OpenClawApp);
+  }
+  if (host.tab === "board") {
+    await loadBoard(host as unknown as import("./app-view-state").AppViewState);
   }
   if (host.tab === "chat") {
     await refreshChat(host as unknown as Parameters<typeof refreshChat>[0]);

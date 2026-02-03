@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { GatewayAuthConfig, GatewayTailscaleMode } from "../config/config.js";
 import { readTailscaleWhoisIdentity, type TailscaleWhoisIdentity } from "../infra/tailscale.js";
 import { isTrustedProxyAddress, parseForwardedForClientIp, resolveGatewayClientIp } from "./net.js";
-export type ResolvedGatewayAuthMode = "token" | "password";
+export type ResolvedGatewayAuthMode = "token" | "password" | "none";
 
 export type ResolvedGatewayAuth = {
   mode: ResolvedGatewayAuthMode;
@@ -222,6 +222,9 @@ export function resolveGatewayAuth(params: {
 }
 
 export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
+  if (auth.mode === "none") {
+    return;
+  }
   if (auth.mode === "token" && !auth.token) {
     if (auth.allowTailscale) {
       return;
@@ -258,6 +261,10 @@ export async function authorizeGatewayConnect(params: {
         user: tailscaleCheck.user.login,
       };
     }
+  }
+
+  if (auth.mode === "none") {
+    return { ok: true };
   }
 
   if (auth.mode === "token") {

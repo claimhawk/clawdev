@@ -2,6 +2,13 @@ const KEY = "openclaw.control.settings.v1";
 
 import type { ThemeMode } from "./theme";
 
+// Token injected by gateway for localhost requests
+declare global {
+  interface Window {
+    __OPENCLAW_GATEWAY_TOKEN__?: string;
+  }
+}
+
 export type UiSettings = {
   gatewayUrl: string;
   token: string;
@@ -21,9 +28,12 @@ export function loadSettings(): UiSettings {
     return `${proto}://${location.host}`;
   })();
 
+  // Use injected token from gateway for localhost, or empty string
+  const injectedToken = window.__OPENCLAW_GATEWAY_TOKEN__ ?? "";
+
   const defaults: UiSettings = {
     gatewayUrl: defaultUrl,
-    token: "",
+    token: injectedToken,
     sessionKey: "main",
     lastActiveSessionKey: "main",
     theme: "system",
@@ -45,7 +55,8 @@ export function loadSettings(): UiSettings {
         typeof parsed.gatewayUrl === "string" && parsed.gatewayUrl.trim()
           ? parsed.gatewayUrl.trim()
           : defaults.gatewayUrl,
-      token: typeof parsed.token === "string" ? parsed.token : defaults.token,
+      // Use saved token if present, otherwise fall back to injected token
+      token: typeof parsed.token === "string" && parsed.token.trim() ? parsed.token : defaults.token,
       sessionKey:
         typeof parsed.sessionKey === "string" && parsed.sessionKey.trim()
           ? parsed.sessionKey.trim()
