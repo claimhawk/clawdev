@@ -7,6 +7,7 @@ import {
   agentsListCommand,
   agentsSetIdentityCommand,
 } from "../../commands/agents.js";
+import { agentsProjectCommand } from "../../commands/agents-project.js";
 import { setVerbose } from "../../globals.js";
 import { defaultRuntime } from "../../runtime.js";
 import { formatDocsLink } from "../../terminal/links.js";
@@ -180,6 +181,67 @@ ${formatHelpExamples([
             theme: opts.theme as string | undefined,
             emoji: opts.emoji as string | undefined,
             avatar: opts.avatar as string | undefined,
+            json: Boolean(opts.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  agents
+    .command("project [name]")
+    .description("Create a project agent with board, heartbeat, and autonomous work protocol")
+    .option("--workspace <dir>", "Workspace directory for the project")
+    .option("--channel <channel>", "Channel to bind (telegram, discord, slack, etc.)")
+    .option("--account <id>", "Account ID on the channel")
+    .option("--heartbeat <interval>", "Heartbeat interval (default: 30m)", "30m")
+    .option("--active-start <time>", "Active hours start (e.g., 22:00 for overnight work)")
+    .option("--active-end <time>", "Active hours end (e.g., 08:00)")
+    .option("--timezone <tz>", "Timezone for active hours (e.g., America/Los_Angeles)")
+    .option("--model <id>", "Model to use for this agent")
+    .option("--non-interactive", "Disable prompts", false)
+    .option("--json", "Output JSON summary", false)
+    .addHelpText(
+      "after",
+      () =>
+        `
+${theme.heading("Examples:")}
+${formatHelpExamples([
+  [
+    'openclaw agents project "Security Hardening"',
+    "Create a project agent for security work.",
+  ],
+  [
+    'openclaw agents project "API Refactor" --channel telegram --heartbeat 1h',
+    "With Telegram channel and hourly heartbeat.",
+  ],
+  [
+    'openclaw agents project "Research" --active-start 22:00 --active-end 08:00 --timezone America/Los_Angeles',
+    "Work overnight only.",
+  ],
+])}
+
+${theme.muted("The agent will:")}
+  - Manage a Kanban board (backlog → done)
+  - Refine vague ideas into concrete tasks
+  - Work autonomously during heartbeat
+  - Persist learnings in MEMORY.md
+`,
+    )
+    .action(async (name, opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await agentsProjectCommand(
+          {
+            name: typeof name === "string" ? name : undefined,
+            workspace: opts.workspace as string | undefined,
+            channel: opts.channel as string | undefined,
+            accountId: opts.account as string | undefined,
+            heartbeat: opts.heartbeat as string | undefined,
+            activeStart: opts.activeStart as string | undefined,
+            activeEnd: opts.activeEnd as string | undefined,
+            timezone: opts.timezone as string | undefined,
+            model: opts.model as string | undefined,
+            nonInteractive: Boolean(opts.nonInteractive),
             json: Boolean(opts.json),
           },
           defaultRuntime,

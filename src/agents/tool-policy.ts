@@ -29,17 +29,20 @@ export const TOOL_GROUPS: Record<string, string[]> = {
   // UI helpers
   "group:ui": ["browser", "canvas"],
   // Automation + infra
-  "group:automation": ["cron", "gateway"],
+  "group:automation": ["cron", "gateway", "board"],
   // Messaging surface
   "group:messaging": ["message"],
   // Nodes + device tools
   "group:nodes": ["nodes"],
+  // Project board management
+  "group:board": ["board"],
   // All OpenClaw native tools (excludes provider plugins).
   "group:openclaw": [
     "browser",
     "canvas",
     "nodes",
     "cron",
+    "board",
     "message",
     "gateway",
     "agents_list",
