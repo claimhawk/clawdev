@@ -1,5 +1,11 @@
 import { html, nothing } from "lit";
-import type { ChannelUiMetaEntry, CronJob, CronRunLogEntry, CronStatus } from "../types";
+import type {
+  AgentsListResult,
+  ChannelUiMetaEntry,
+  CronJob,
+  CronRunLogEntry,
+  CronStatus,
+} from "../types";
 import type { CronFormState } from "../ui-types";
 import { formatMs } from "../format";
 import {
@@ -8,6 +14,7 @@ import {
   formatCronState,
   formatNextRun,
 } from "../presenter";
+import { parseAgentSessionKey } from "../../../../src/routing/session-key.js";
 
 export type CronProps = {
   loading: boolean;
@@ -21,6 +28,9 @@ export type CronProps = {
   channelMeta?: ChannelUiMetaEntry[];
   runsJobId: string | null;
   runs: CronRunLogEntry[];
+  sessionKey: string;
+  agentsList: AgentsListResult | null;
+  showAllProjects: boolean;
   onFormChange: (patch: Partial<CronFormState>) => void;
   onRefresh: () => void;
   onAdd: () => void;
@@ -28,7 +38,20 @@ export type CronProps = {
   onRun: (job: CronJob) => void;
   onRemove: (job: CronJob) => void;
   onLoadRuns: (jobId: string) => void;
+  onToggleAll: (agentId: string, enabled: boolean) => void;
+  onShowAllProjectsChange: (showAll: boolean) => void;
 };
+
+/** Normalize agentId: treat undefined/null/"" as "main". */
+function normalizeAgentId(agentId: string | undefined | null): string {
+  const id = (agentId ?? "").trim();
+  return id || "main";
+}
+
+function resolveCurrentAgentId(sessionKey: string): string {
+  const parsed = parseAgentSessionKey(sessionKey);
+  return parsed?.agentId ?? "main";
+}
 
 function buildChannelOptions(props: CronProps): string[] {
   const options = ["last", ...props.channels.filter(Boolean)];
@@ -46,6 +69,33 @@ function buildChannelOptions(props: CronProps): string[] {
   });
 }
 
+function resolveAgentLabel(props: CronProps, agentId: string): string {
+  if (agentId === "main") {
+    return "Main";
+  }
+  const agent = props.agentsList?.agents?.find((a) => a.id === agentId);
+  return agent?.name ?? agent?.identity?.name ?? agentId;
+}
+
+function buildAgentOptions(props: CronProps): Array<{ id: string; label: string }> {
+  const options: Array<{ id: string; label: string }> = [{ id: "main", label: "Main" }];
+  const agents = props.agentsList?.agents ?? [];
+  for (const agent of agents) {
+    if (agent.id && agent.id !== "main") {
+      options.push({
+        id: agent.id,
+        label: agent.name ?? agent.identity?.name ?? agent.id,
+      });
+    }
+  }
+  // Ensure the current form value is in the list
+  const formId = (props.form.agentId ?? "").trim();
+  if (formId && !options.some((o) => o.id === formId)) {
+    options.push({ id: formId, label: formId });
+  }
+  return options;
+}
+
 function resolveChannelLabel(props: CronProps, channel: string): string {
   if (channel === "last") {
     return "last";
@@ -59,6 +109,22 @@ function resolveChannelLabel(props: CronProps, channel: string): string {
 
 export function renderCron(props: CronProps) {
   const channelOptions = buildChannelOptions(props);
+  const currentAgentId = resolveCurrentAgentId(props.sessionKey);
+  const filteredJobs = props.showAllProjects
+    ? props.jobs
+    : props.jobs.filter(
+        (job) => normalizeAgentId(job.agentId) === currentAgentId,
+      );
+  const agentJobs = props.jobs.filter(
+    (job) => normalizeAgentId(job.agentId) === currentAgentId,
+  );
+  const allEnabled = agentJobs.length > 0 && agentJobs.every((j) => j.enabled);
+  const allDisabled = agentJobs.length > 0 && agentJobs.every((j) => !j.enabled);
+  const agentLabel = resolveAgentLabel(props, currentAgentId);
+
+  // Build agent select options for the form
+  const agentOptions = buildAgentOptions(props);
+
   return html`
     <section class="grid grid-cols-2">
       <div class="card">
@@ -109,13 +175,17 @@ export function renderCron(props: CronProps) {
             />
           </label>
           <label class="field">
-            <span>Agent ID</span>
-            <input
-              .value=${props.form.agentId}
-              @input=${(e: Event) =>
-                props.onFormChange({ agentId: (e.target as HTMLInputElement).value })}
-              placeholder="default"
-            />
+            <span>Agent</span>
+            <select
+              .value=${props.form.agentId || currentAgentId}
+              @change=${(e: Event) =>
+                props.onFormChange({ agentId: (e.target as HTMLSelectElement).value })}
+            >
+              ${agentOptions.map(
+                (opt) =>
+                  html`<option value=${opt.id}>${opt.label}</option>`,
+              )}
+            </select>
           </label>
           <label class="field checkbox">
             <span>Enabled</span>
@@ -277,16 +347,48 @@ export function renderCron(props: CronProps) {
     </section>
 
     <section class="card" style="margin-top: 18px;">
-      <div class="card-title">Jobs</div>
-      <div class="card-sub">All scheduled jobs stored in the gateway.</div>
+      <div class="card-title" style="display: flex; align-items: center; gap: 10px;">
+        Jobs
+        <span
+          class="chip ${props.showAllProjects ? "" : "chip--active"}"
+          style="cursor: pointer; user-select: none;"
+          @click=${() => props.onShowAllProjectsChange(!props.showAllProjects)}
+        >
+          ${props.showAllProjects ? "All Projects" : agentLabel}
+        </span>
+      </div>
+      <div class="card-sub">
+        ${props.showAllProjects
+          ? "All scheduled jobs across every agent."
+          : `Showing jobs for ${agentLabel}.`}
+      </div>
+      ${agentJobs.length > 0
+        ? html`
+          <div class="row" style="margin-top: 10px; gap: 8px; align-items: center;">
+            <span class="muted" style="font-size: 13px;">${agentLabel} cron jobs:</span>
+            <button
+              class="btn${allDisabled ? " primary" : ""}"
+              style="font-size: 12px; padding: 3px 10px;"
+              ?disabled=${props.busy || allEnabled}
+              @click=${() => props.onToggleAll(currentAgentId, true)}
+            >Enable all</button>
+            <button
+              class="btn${allEnabled ? " danger" : ""}"
+              style="font-size: 12px; padding: 3px 10px;"
+              ?disabled=${props.busy || allDisabled}
+              @click=${() => props.onToggleAll(currentAgentId, false)}
+            >Disable all</button>
+          </div>
+        `
+        : nothing}
       ${
-        props.jobs.length === 0
+        filteredJobs.length === 0
           ? html`
-              <div class="muted" style="margin-top: 12px">No jobs yet.</div>
+              <div class="muted" style="margin-top: 12px">No jobs${props.showAllProjects ? "" : ` for ${agentLabel}`}.</div>
             `
           : html`
             <div class="list" style="margin-top: 12px;">
-              ${props.jobs.map((job) => renderJob(job, props))}
+              ${filteredJobs.map((job) => renderJob(job, props))}
             </div>
           `
       }

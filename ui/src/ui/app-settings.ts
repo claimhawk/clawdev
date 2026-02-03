@@ -43,6 +43,7 @@ type SettingsHost = {
   logsAtBottom: boolean;
   eventLog: unknown[];
   eventLogBuffer: unknown[];
+  configPreviousTab: Tab | null;
   basePath: string;
   themeMedia: MediaQueryList | null;
   themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
@@ -133,6 +134,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
 }
 
 export function setTab(host: SettingsHost, next: Tab) {
+  if (next === "config" && host.tab !== "config") {
+    host.configPreviousTab = host.tab;
+  }
   if (host.tab !== next) {
     host.tab = next;
   }

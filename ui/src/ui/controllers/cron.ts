@@ -206,6 +206,45 @@ export async function removeCronJob(state: CronState, job: CronJob) {
   }
 }
 
+/** Normalize agentId: treat undefined/null/"" as "main". */
+function normalizeAgentId(agentId: string | undefined | null): string {
+  const id = (agentId ?? "").trim();
+  return id || "main";
+}
+
+/** Bulk-toggle enabled for all jobs belonging to a specific agent. */
+export async function toggleAllCronJobsForAgent(
+  state: CronState,
+  agentId: string,
+  enabled: boolean,
+) {
+  if (!state.client || !state.connected || state.cronBusy) {
+    return;
+  }
+  const normalized = normalizeAgentId(agentId);
+  const matching = state.cronJobs.filter(
+    (job) => normalizeAgentId(job.agentId) === normalized,
+  );
+  if (matching.length === 0) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
+    await Promise.all(
+      matching.map((job) =>
+        state.client!.request("cron.update", { id: job.id, patch: { enabled } }),
+      ),
+    );
+    await loadCronJobs(state);
+    await loadCronStatus(state);
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
+}
+
 export async function loadCronRuns(state: CronState, jobId: string) {
   if (!state.client || !state.connected) {
     return;

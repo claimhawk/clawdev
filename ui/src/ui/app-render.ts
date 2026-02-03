@@ -22,6 +22,7 @@ import {
 import {
   loadCronRuns,
   toggleCronJob,
+  toggleAllCronJobsForAgent,
   runCronJob,
   removeCronJob,
   addCronJob,
@@ -116,21 +117,21 @@ export function renderApp(state: AppViewState) {
           </button>
           <div class="brand">
             <div class="brand-logo">
-              <img src="/favicon.svg" alt="OpenClaw" />
+              <img class="brand-logo__dark" src="/logo-dark.png" alt="Bonsai-OS" />
+              <img class="brand-logo__light" src="/logo-light.png" alt="Bonsai-OS" />
             </div>
             <div class="brand-text">
-              <div class="brand-title">OPENCLAW</div>
-              <div class="brand-sub">Gateway Dashboard</div>
+              <div class="brand-title">BONSAI-OS</div>
+              <div class="brand-sub">Mission Control</div>
             </div>
           </div>
         </div>
         <div class="topbar-status">
           ${renderSessionSelector(state)}
-          <div class="pill">
-            <span class="statusDot ${state.connected ? "ok" : ""}"></span>
-            <span>Health</span>
-            <span class="mono">${state.connected ? "OK" : "Offline"}</span>
-          </div>
+          <span
+            class="health-icon ${state.connected ? "health-icon--ok" : "health-icon--off"}"
+            title=${state.connected ? "Connected" : "Offline"}
+          >${icons.heartPulse}</span>
           ${renderThemeToggle(state)}
         </div>
       </header>
@@ -181,7 +182,7 @@ export function renderApp(state: AppViewState) {
       </aside>
       <main class="content ${isChat ? "content--chat" : ""}">
         ${
-          state.tab !== "board"
+          state.tab !== "board" && state.tab !== "config"
             ? html`<section class="content-header">
               <div>
                 <div class="page-title">${titleForTab(state.tab)}</div>
@@ -192,7 +193,7 @@ export function renderApp(state: AppViewState) {
                 ${isChat ? renderChatControls(state) : nothing}
               </div>
             </section>`
-            : state.lastError
+            : state.lastError && state.tab !== "config"
               ? html`<div class="pill danger" style="margin-bottom: 8px;">${state.lastError}</div>`
               : nothing
         }
@@ -337,6 +338,9 @@ export function renderApp(state: AppViewState) {
                 channelMeta: state.channelsSnapshot?.channelMeta ?? [],
                 runsJobId: state.cronRunsJobId,
                 runs: state.cronRuns,
+                sessionKey: state.sessionKey,
+                agentsList: state.agentsList,
+                showAllProjects: state.cronShowAllProjects,
                 onFormChange: (patch) => (state.cronForm = { ...state.cronForm, ...patch }),
                 onRefresh: () => state.loadCron(),
                 onAdd: () => addCronJob(state),
@@ -344,6 +348,10 @@ export function renderApp(state: AppViewState) {
                 onRun: (job) => runCronJob(state, job),
                 onRemove: (job) => removeCronJob(state, job),
                 onLoadRuns: (jobId) => loadCronRuns(state, jobId),
+                onToggleAll: (agentId, enabled) =>
+                  toggleAllCronJobsForAgent(state, agentId, enabled),
+                onShowAllProjectsChange: (showAll) =>
+                  (state.cronShowAllProjects = showAll),
               })
             : nothing
         }
@@ -528,43 +536,8 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "config"
-            ? renderConfig({
-                raw: state.configRaw,
-                originalRaw: state.configRawOriginal,
-                valid: state.configValid,
-                issues: state.configIssues,
-                loading: state.configLoading,
-                saving: state.configSaving,
-                applying: state.configApplying,
-                updating: state.updateRunning,
-                connected: state.connected,
-                schema: state.configSchema,
-                schemaLoading: state.configSchemaLoading,
-                uiHints: state.configUiHints,
-                formMode: state.configFormMode,
-                formValue: state.configForm,
-                originalValue: state.configFormOriginal,
-                searchQuery: state.configSearchQuery,
-                activeSection: state.configActiveSection,
-                activeSubsection: state.configActiveSubsection,
-                onRawChange: (next) => {
-                  state.configRaw = next;
-                },
-                onFormModeChange: (mode) => (state.configFormMode = mode),
-                onFormPatch: (path, value) => updateConfigFormValue(state, path, value),
-                onSearchChange: (query) => (state.configSearchQuery = query),
-                onSectionChange: (section) => {
-                  state.configActiveSection = section;
-                  state.configActiveSubsection = null;
-                },
-                onSubsectionChange: (section) => (state.configActiveSubsection = section),
-                onReload: () => loadConfig(state),
-                onSave: () => saveConfig(state),
-                onApply: () => applyConfig(state),
-                onUpdate: () => runUpdate(state),
-              })
-            : nothing
+          // Config is rendered as a full-viewport modal overlay (see below)
+          nothing
         }
 
         ${
@@ -611,6 +584,49 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
       </main>
+      ${
+        state.tab === "config"
+          ? renderConfig({
+              raw: state.configRaw,
+              originalRaw: state.configRawOriginal,
+              valid: state.configValid,
+              issues: state.configIssues,
+              loading: state.configLoading,
+              saving: state.configSaving,
+              applying: state.configApplying,
+              updating: state.updateRunning,
+              connected: state.connected,
+              schema: state.configSchema,
+              schemaLoading: state.configSchemaLoading,
+              uiHints: state.configUiHints,
+              formMode: state.configFormMode,
+              formValue: state.configForm,
+              originalValue: state.configFormOriginal,
+              searchQuery: state.configSearchQuery,
+              activeSection: state.configActiveSection,
+              activeSubsection: state.configActiveSubsection,
+              onRawChange: (next) => {
+                state.configRaw = next;
+              },
+              onFormModeChange: (mode) => (state.configFormMode = mode),
+              onFormPatch: (path, value) => updateConfigFormValue(state, path, value),
+              onSearchChange: (query) => (state.configSearchQuery = query),
+              onSectionChange: (section) => {
+                state.configActiveSection = section;
+                state.configActiveSubsection = null;
+              },
+              onSubsectionChange: (section) => (state.configActiveSubsection = section),
+              onReload: () => loadConfig(state),
+              onSave: () => saveConfig(state),
+              onApply: () => applyConfig(state),
+              onUpdate: () => runUpdate(state),
+              onBack: () => {
+                const prev = state.configPreviousTab ?? "overview";
+                state.setTab(prev);
+              },
+            })
+          : nothing
+      }
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
     </div>

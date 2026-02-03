@@ -2,16 +2,83 @@
    Config Page - Carbon Design System
    =========================================== */
 
+/* Modal Overlay */
+.config-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.config-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.config-modal__header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.config-modal__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.config-modal__sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.config-modal__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.config-modal__back:hover {
+  background: var(--hover);
+  border-color: var(--border-active, var(--border));
+}
+
+.config-modal__back svg {
+  width: 14px;
+  height: 14px;
+}
+
+.config-modal__body {
+  flex: 1;
+  overflow: hidden;
+}
+
 /* Layout Container */
 .config-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 0;
-  height: calc(100vh - 160px);
-  margin: -16px;
-  border-radius: var(--radius-xl);
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: none;
   background: var(--panel);
 }
 

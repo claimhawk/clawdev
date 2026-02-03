@@ -173,6 +173,7 @@ export class OpenClawApp extends LitElement {
   @state() configForm: Record<string, unknown> | null = null;
   @state() configFormOriginal: Record<string, unknown> | null = null;
   @state() configFormDirty = false;
+  @state() configPreviousTab: Tab | null = null;
   @state() configFormMode: "form" | "raw" = "form";
   @state() configSearchQuery = "";
   @state() configActiveSection: string | null = null;
@@ -218,6 +219,7 @@ export class OpenClawApp extends LitElement {
   @state() cronRunsJobId: string | null = null;
   @state() cronRuns: CronRunLogEntry[] = [];
   @state() cronBusy = false;
+  @state() cronShowAllProjects = false;
 
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;

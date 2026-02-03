@@ -32,6 +32,7 @@ export type ConfigProps = {
   onSave: () => void;
   onApply: () => void;
   onUpdate: () => void;
+  onBack: () => void;
 };
 
 // SVG Icons for sidebar (Lucide-style)
@@ -460,6 +461,20 @@ export function renderConfig(props: ConfigProps) {
   const canUpdate = props.connected && !props.applying && !props.updating;
 
   return html`
+    <div class="config-modal">
+      <div class="config-modal__header">
+        <div class="config-modal__header-left">
+          <div class="config-modal__title">Config</div>
+          <div class="config-modal__sub">Edit ~/.openclaw/openclaw.json safely.</div>
+        </div>
+        <button class="config-modal__back" @click=${props.onBack}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          Back
+        </button>
+      </div>
+      <div class="config-modal__body">
     <div class="config-layout">
       <!-- Sidebar -->
       <aside class="config-sidebar">
@@ -754,6 +769,8 @@ ${JSON.stringify(props.issues, null, 2)}</pre
             : nothing
         }
       </main>
+    </div>
+      </div>
     </div>
   `;
 }
